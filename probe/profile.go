@@ -7,8 +7,9 @@ import (
 	"github.com/hstern/go-activesync/eas"
 )
 
-// Version is the easprobe version, also part of the User-Agent marker.
-const Version = "0.1.0"
+// Version is the version of eas-tools: every program of the toolbox has this one, and it is also part of the User-Agent marker. push-release.sh
+// reads it from here, and the tag vX.Y.Z of a release has to be this version (the release workflow checks that).
+const Version = "0.9.0"
 
 // DefaultProfile imitates an iPhone, so the probe sees the same code paths
 // and device-type rules as real users; the "-easprobe" marker in its

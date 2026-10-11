@@ -133,7 +133,7 @@ configuration to know what a running program does.
 The start writes **one short line for each port**. It says what is enabled and with which security, and nothing else:
 
 ```
-INFO started version=0.1.0 targets=[traveler-lab] mail_monitor=1 min_interval=1m0s state=/data/state.json devices=2 config="..."
+INFO started version=0.9.0 targets=[traveler-lab] mail_monitor=1 min_interval=1m0s state=/data/state.json devices=2 config="..."
 INFO listener name=main addr=0.0.0.0:9117 proto=https from=10.0.0.0/8 auth="token(/probe /debug/state /config/reload) none(/metrics /health)"
 INFO listener name=metrics addr=0.0.0.0:9100 proto=http from=open auth="none(/metrics /health)"
 ```

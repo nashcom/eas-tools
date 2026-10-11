@@ -27,6 +27,7 @@ Supporting tools, and the rest of the documentation:
 git clone https://github.com/nashcom/eas-tools.git && cd eas-tools
 ./compile.sh            # the programs for Linux amd64 in bin/linux-amd64/ (other platforms: see its usage text); needs Docker
 ./build.sh              # the container image nashcom/eas-tools with the exporter, the probe, the load worker and the client
+docker pull ghcr.io/nashcom/eas-tools:latest   # or the finished image, for amd64 and arm64, from the first release on
 ```
 
 - **Passwords** never go on a command line: they come from a file, from the environment or from stdin.

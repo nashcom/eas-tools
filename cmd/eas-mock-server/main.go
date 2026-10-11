@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/nashcom/eas-tools/internal/easmockserver"
+	"github.com/nashcom/eas-tools/probe"
 )
 
 func main() {
@@ -35,12 +36,18 @@ func run() int {
 		dropMail  = flag.Bool("drop-mail", false, "accept SendMail but never deliver the mail (to see a lost mail)")
 		mailbox   = flag.Bool("mailbox", false, "a small real mailbox: folders, mails that stay until moved or deleted, Fetch, MoveItems, SendMail with a copy in Sent Items (for eas-client; mails sent to a user that has logged in arrive)")
 		sim       = flag.Bool("sim", false, "honor the X-Mock-Sim request header: the request tells the server how to misbehave (delay, http status, EAS status, garbage, close; see docs/MOCKSERVER.md)")
+		showVer   = flag.Bool("version", false, "print version and exit")
 	)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "eas-mock-server - mock ActiveSync server for demos\n\nUsage:\n  eas-mock-server -listen :8099 -mail-every 30s -latency 50ms\n\nOptions:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	if *showVer {
+		fmt.Println("eas-mock-server", probe.Version)
+		return 0
+	}
 
 	if *errorRate < 0 || *errorRate > 1 {
 		fmt.Fprintln(os.Stderr, "eas-mock-server: -error-rate must be between 0 and 1")

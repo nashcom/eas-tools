@@ -56,7 +56,7 @@ docker compose up -d
 | **Wolfi**            | `container/dockerfile_wolfi`  | `cgr.dev/chainguard/go:latest` | `cgr.dev/chainguard/wolfi-base`    | Chainguard Wolfi base, optimized for few CVEs. |
 | **Static**           | `container/dockerfile_static` | `cgr.dev/chainguard/go:latest` | `cgr.dev/chainguard/static:latest` | Smallest image: only the binaries, no shell.   |
 
-The images are tagged `nashcom/eas-tools` (Alpine), `nashcom/eas-tools:wolfi` and `nashcom/eas-tools:static`.
+The images are tagged `nashcom/eas-tools` (Alpine), `nashcom/eas-tools:wolfi` and `nashcom/eas-tools:static`. The released images, for amd64 and arm64, are `ghcr.io/nashcom/eas-tools` with the same tags (see DEVELOPMENT.md, "Versions, releases and the container images").
 
 ---
 

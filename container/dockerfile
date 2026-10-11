@@ -1,7 +1,12 @@
 # ---- Build stage ----
 
-FROM golang:alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
 WORKDIR /src
+
+# The Go compiler runs on the machine that builds (BUILDPLATFORM) and makes the programs for the image that is built (TARGETARCH): an arm64
+# image is cross-compiled, not built under emulation, which would take ten times as long. Without BuildKit both are empty: the host is used.
+ARG TARGETOS
+ARG TARGETARCH
 
 # Modules first, so that they stay cached when only the source changes
 COPY go.mod go.sum ./
@@ -10,7 +15,7 @@ RUN go mod download
 COPY . .
 
 # Static binaries: the exporter, the command line probe, the load worker and the mail client (eas-client, see docker-compose.client.yml)
-RUN set -e; mkdir -p /tmp/out; for c in eas-blackbox-exporter eas-probe eas-load eas-client; do CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /tmp/out/$c ./cmd/$c; done
+RUN set -e; mkdir -p /tmp/out; for c in eas-blackbox-exporter eas-probe eas-load eas-client; do CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /tmp/out/$c ./cmd/$c; done
 
 # ---- Runtime image ----
 

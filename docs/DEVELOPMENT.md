@@ -2,7 +2,8 @@
 
 [Back to the overview](../README.md).
 
-Contents: [Quick reference](#quick-reference) | [Go and dependency versions](#go-and-dependency-versions) | [Build and test](#build-and-test) | [Layout](#layout) | [Validation status](#validation-status) | [Known limits](#known-limits)
+
+Contents: [Quick reference](#quick-reference) | [Versions, releases and the container images](#versions-releases-and-the-container-images) | [Go and dependency versions](#go-and-dependency-versions) | [Build and test](#build-and-test) | [Layout](#layout) | [Validation status](#validation-status) | [Known limits](#known-limits)
 
 ## Quick reference
 
@@ -13,6 +14,40 @@ scripts/update.sh                            # latest Go and dependencies, then 
 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-s -w' -o easload-linux-amd64 ./cmd/eas-load
 ```
 
+
+## Versions, releases and the container images
+
+**One version for everything.** `Version` in `probe/profile.go` is the version of all the programs: `eas-blackbox-exporter`, `eas-probe`,
+`eas-load`, `eas-client` and `eas-mock-server` print it with `-version`, and it is the version in their logs and in the User-Agent marker. A
+test fails if a program gets a version of its own. The form is `X.Y.Z`; the first version is 0.9.0.
+
+**Making a release.**
+
+1. Raise `Version` in `probe/profile.go`.
+2. Add a section `## X.Y.Z` to `CHANGES.md` with what changed. It becomes the text of the GitHub release.
+3. Commit and push that.
+4. Run `./push-release.sh`. It checks the version, that the section exists, that everything is committed and that the tag does not exist yet
+   (`-force` moves a tag, which builds the images of that version again), writes `version.txt`, and pushes the tag `vX.Y.Z`.
+
+The tag starts the workflow `.github/workflows/release.yml`, which checks that the tag is the version of the program, runs `go vet` and the
+tests, builds the images and makes the GitHub release.
+
+**The images** are built for **amd64 and arm64** in one go and pushed to `ghcr.io/nashcom/eas-tools`, as a manifest list, so that a pull
+gets the right architecture:
+
+| Image                                    | Base                        | Tags                        |
+| ---------------------------------------- | --------------------------- | --------------------------- |
+| `ghcr.io/nashcom/eas-tools`              | Alpine                      | `X.Y.Z` and `latest`        |
+| `ghcr.io/nashcom/eas-tools:X.Y.Z-wolfi`  | Wolfi                       | `X.Y.Z-wolfi` and `wolfi`   |
+| `ghcr.io/nashcom/eas-tools:X.Y.Z-static` | no shell, only the programs | `X.Y.Z-static` and `static` |
+
+The Dockerfiles cross-compile the Go programs on the machine that builds (`--platform=$BUILDPLATFORM`, `GOARCH=$TARGETARCH`), so the arm64
+image does not need an emulated compiler. The first push of a package to GHCR is private: set the package to public in its settings on GitHub
+(the label `org.opencontainers.image.source` has linked it to this repository).
+
+**Continuous integration** (`.github/workflows/ci.yml`) runs on every push and pull request: `gofmt`, `go vet`, the unit tests, and a build of
+the image for amd64 and arm64 that is not pushed. To try the multi-platform build on your machine:
+`docker buildx build --platform linux/amd64,linux/arm64 -f container/dockerfile .`
 
 ## Go and dependency versions
 

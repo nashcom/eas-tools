@@ -1,0 +1,29 @@
+# Changes
+
+Newest version first. Every change is noted here with the change itself. All the programs of the toolbox have the same version (the constant
+`Version` in `probe/profile.go`). `push-release.sh` refuses to tag a version that has no section here, and the release workflow makes the text of
+the GitHub release from it.
+
+## 0.9.0
+
+**The first version of eas-tools, an ActiveSync toolbox for HCL Traveler.** Three deliverables and two supporting tools, all with this version.
+
+- **Blackbox exporter** (`eas-blackbox-exporter`): Prometheus scrapes `/probe?target=NAME` and gets the metrics of an ActiveSync probe: login,
+  Provision, FolderSync, Sync, a held Ping, a mail round trip, and the mail monitor for mail to an address outside. Configuration from a file,
+  from environment variables or from an `https://` location that is checked on a timer, with reload; alert rules and scrape jobs in `deploy/`.
+- **Performance test** (`eas-load` with the coordinator [nshtestherd](https://github.com/nashcom/nshtestherd), 0.9.2 or newer): simulated users and
+  devices with the jobs probe, directory lookups, sync, push and mail; `scripts/roundtrip.sh` and `scripts/roundtrip.ps1` run the whole chain in one
+  command and check it.
+- **EAS client** (`eas-client`): mail (list, get, send, reply, forward, read, move, delete, `.eml`), calendar (list, get, `.ics`, create with
+  invitations, delete) and contacts (list, get, vCard) from the command line and through a REST API that prints the same JSON, with OpenAPI and
+  Swagger UI. Reading is always allowed; changing the mailbox (`-write`) and sending (`-send`) are two separate switches.
+- **`eas-probe`**, one probe on the command line (the engine of the exporter), and **`eas-mock-server`**, a stand-in ActiveSync server for demos,
+  development and CI.
+- **Secure by default.** The exporter and the client serve HTTPS unless plain HTTP is chosen (`allow_http`), and plain HTTP is on the loopback
+  interface unless another address is named. The certificate comes from `/run/secrets/tls` (`tls.crt`, `tls.key`, `ca.crt`), or the program
+  makes one with a small CA of its own, which is for a try and is made again at every start; a certificate of your own is never touched and is
+  picked up when it is renewed. An allow list of addresses and networks (`allow_from`) guards every endpoint. The metrics of the exporter are on a
+  port of their own (9100). The log of the start has one line for each port.
+- **Container images** for amd64 and arm64: `ghcr.io/nashcom/eas-tools` (Alpine), `:wolfi` and `:static`, all non-root, with every capability
+  dropped.
+- **One dash for the options** in all the tools: `-server`, `-password-file`. The double dash is still read where it was read before.

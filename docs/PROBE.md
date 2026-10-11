@@ -152,7 +152,7 @@ the program: `service.name`, `service.version`, `service.instance.id` and `host.
 `process.executable.name` and `process.pid`. `attributes` holds the other fields of the message, empty when there are none:
 
 ```
-{"time_unix_nano":"1791650970799591200","observed_time_unix_nano":"1791650970799591200","severity_number":9,"severity_text":"INFO","body":"configuration reloaded","scope":{"name":"easprobe","version":"0.1.0"},"resource":{"service.name":"eas-blackbox-exporter","service.version":"0.1.0","service.instance.id":"traveler-monitor","host.name":"traveler-monitor","os.type":"linux","process.executable.name":"eas-blackbox-exporter","process.pid":1},"attributes":{"source":"https://nashcom.de/exporter-dnuglab.json","targets":["traveler-lab"]}}
+{"time_unix_nano":"1791650970799591200","observed_time_unix_nano":"1791650970799591200","severity_number":9,"severity_text":"INFO","body":"configuration reloaded","scope":{"name":"easprobe","version":"0.9.0"},"resource":{"service.name":"eas-blackbox-exporter","service.version":"0.9.0","service.instance.id":"traveler-monitor","host.name":"traveler-monitor","os.type":"linux","process.executable.name":"eas-blackbox-exporter","process.pid":1},"attributes":{"source":"https://nashcom.de/exporter-dnuglab.json","targets":["traveler-lab"]}}
 ```
 
 A collector or a log forwarder can read that line almost as it is. The exporter applies a changed `log_format` of a reloaded

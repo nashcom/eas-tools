@@ -71,8 +71,8 @@ func ParseFormat(name string) error { return (&State{}).SetFormat(name) }
 // "attributes":
 //
 //	{"time_unix_nano":"1791645434251000000","observed_time_unix_nano":"1791645434251000000","severity_number":9,
-//	 "severity_text":"INFO","body":"configuration reloaded","scope":{"name":"easprobe","version":"0.1.0"},
-//	 "resource":{"service.name":"eas-blackbox-exporter","service.version":"0.1.0","host.name":"h","os.type":"linux",...},
+//	 "severity_text":"INFO","body":"configuration reloaded","scope":{"name":"easprobe","version":"0.9.0"},
+//	 "resource":{"service.name":"eas-blackbox-exporter","service.version":"0.9.0","host.name":"h","os.type":"linux",...},
 //	 "attributes":{"source":"https://example.com/c.json","targets":["lab"]}}
 func New(w io.Writer, state *State, service, version string) *slog.Logger {
 	return slog.New(&handler{out: &output{w: w}, state: state, version: version, resource: resourceJSON(service, version)})
