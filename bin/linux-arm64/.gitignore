@@ -1,0 +1,4 @@
+# built programs are not committed; this file keeps the folder in the repository
+*
+!.gitignore
+!README.md

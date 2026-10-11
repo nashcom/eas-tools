@@ -1,0 +1,17 @@
+{
+  "server": "traveler.example.com",
+  "user": "loadtest@example.com",
+  "password": "secret-password",
+  "devices": 10,
+  "profile": "iphone",
+  "log_level": "info",
+  "log_format": "text",
+  "name": "eas-load",
+  "state_file": "/data/eas-load-state.json",
+  "job": "eas-mail",
+  "params": "to=self&think=5-10&size=1-5&attach=50-200&files=2&count=3&cleanup=yes",
+  "duration": "8m",
+  "ramp": "10s",
+  "report": "30s",
+  "result_file": "/data/result.json"
+}

@@ -1,0 +1,8 @@
+# Test image: the Go image plus bash and curl, which tests/e2e.sh and
+# scripts/roundtrip.sh need. The source is mounted at run time (see ../test.sh).
+
+FROM golang:alpine
+
+RUN apk add --no-cache bash curl
+
+WORKDIR /src

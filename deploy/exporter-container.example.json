@@ -1,0 +1,35 @@
+{
+  "log_level": "info",
+  "log_format": "text",
+  "state_file": "/data/state.json",
+  "autosave_seconds": 30,
+  "min_interval_seconds": 60,
+  "max_concurrent": 10,
+  "max_ping_seconds": 120,
+  "auth_token_file": "/run/secrets/eas_probe_token",
+  "allow_from": [],
+  "tls_cert": "",
+  "tls_key": "",
+  "tls_generate": false,
+  "listen_metrics": "",
+  "allow_from_metrics": [],
+
+  "targets": [
+    {
+      "name": "traveler-lab",
+      "server": "traveler.example.com",
+      "user": "probe@example.com",
+      "password": "secret-password",
+      "profile": "iphone",
+      "mail": true,
+      "mail_wait_seconds": 60
+    },
+    {
+      "name": "traveler-prod",
+      "email": "probe@example.org",
+      "password_file": "/run/secrets/traveler_prod_password",
+      "profile": "iphone",
+      "provision": "auto"
+    }
+  ]
+}

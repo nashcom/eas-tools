@@ -1,0 +1,32 @@
+# Enforce LF line endings for all text files
+* text=auto eol=lf
+
+# Shell scripts, Go source and config formats
+*.sh text eol=lf
+*.go text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.mod text eol=lf
+*.sum text eol=lf
+.env text eol=lf
+*.env text eol=lf
+
+# Dockerfiles
+dockerfile* text eol=lf
+Dockerfile* text eol=lf
+
+# Windows scripts
+*.cmd text eol=crlf
+*.ps1 text eol=lf
+
+# Binary files - never modify
+*.exe binary
+*.png binary
+*.jpg binary
+*.zip binary
+*.gz binary
+*.pem binary
+*.crt binary
+*.key binary

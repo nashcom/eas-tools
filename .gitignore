@@ -1,0 +1,21 @@
+# built programs (bin/ has its own .gitignore files per platform folder)
+*.exe
+
+# lab and local settings, secrets and state
+.env
+config.json
+lab-*.json
+lab-*.env
+/*.env
+secrets/
+exporter-state.json
+state.json
+*.corrupt-*
+*.tmp
+*.swp
+*.log
+*-trace*.txt
+
+# personal wrappers
+run.cmd
+run-exporter.cmd

@@ -1,0 +1,88 @@
+# Prometheus scrape configuration for the ActiveSync probe exporter.
+# "eas-probe:9117" is the exporter's HTTPS port as seen from Prometheus (TLS is the default); its metrics port is 9100, plain HTTP.
+
+scrape_configs:
+  # Regular probe: login state, Provision check, FolderSync, Inbox Sync.
+  # The exporter caches results for min_interval_seconds (default 60), so a
+  # shorter scrape interval does not create extra load on the server.
+  - job_name: eas_probe
+    metrics_path: /probe
+    scheme: https                        # TLS is the default of the exporter: the micro CA of a container, or the CA of your certificate
+    tls_config:
+      ca_file: /etc/prometheus/secrets/eas_ca.crt
+      server_name: eas-probe             # a name in the certificate (tls_names), when the target is another name or an address
+    scrape_interval: 60s
+    scrape_timeout: 30s
+    authorization:                       # matches auth_token / auth_token_file of the exporter (the default header name)
+      credentials_file: /etc/prometheus/secrets/eas_probe_token
+    static_configs:
+      - targets:                         # target names from the exporter's config.json
+          - traveler-lab
+          - traveler-prod
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: eas-probe:9117
+
+  # Held Ping: keeps a Ping open for 60 seconds, so run it less often and
+  # give it a scrape timeout longer than the ping.
+  - job_name: eas_probe_ping
+    metrics_path: /probe
+    scheme: https                        # TLS is the default of the exporter: the micro CA of a container, or the CA of your certificate
+    tls_config:
+      ca_file: /etc/prometheus/secrets/eas_ca.crt
+      server_name: eas-probe             # a name in the certificate (tls_names), when the target is another name or an address
+    params:
+      ping: ["60"]
+    scrape_interval: 5m
+    scrape_timeout: 120s
+    authorization:
+      credentials_file: /etc/prometheus/secrets/eas_probe_token
+    static_configs:
+      - targets:
+          - traveler-lab
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: eas-probe:9117
+
+  # Mail round trip: sends a mail to the account itself on every real probe,
+  # so it has its own job with a long interval. The target needs "mail": true in config.json.
+  - job_name: eas_probe_mail
+    metrics_path: /probe
+    scheme: https                        # TLS is the default of the exporter: the micro CA of a container, or the CA of your certificate
+    tls_config:
+      ca_file: /etc/prometheus/secrets/eas_ca.crt
+      server_name: eas-probe             # a name in the certificate (tls_names), when the target is another name or an address
+    params:
+      mail: ["1"]
+    scrape_interval: 15m
+    scrape_timeout: 150s
+    authorization:
+      credentials_file: /etc/prometheus/secrets/eas_probe_token
+    static_configs:
+      - targets:
+          - traveler-lab
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: eas-probe:9117
+
+  # The exporter's own counters (probes, errors, cache hits, uptime).
+  # /metrics needs no token: this job uses the metrics port of the exporter, plain HTTP, open unless allow_from_metrics restricts it
+  # (docs/TLS.md). The jobs above carry the token of /probe and use HTTPS.
+  - job_name: eas_probe_exporter
+    static_configs:
+      - targets: ["eas-probe:9100"]
+
+rule_files:
+  - eas_probe_rules.yml

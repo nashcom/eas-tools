@@ -1,0 +1,26 @@
+{
+  "listen": "127.0.0.1:9116",
+  "log_level": "info",
+  "log_format": "text",
+  "state_file": "exporter-state.json",
+  "min_interval_seconds": 60,
+
+  "targets": [
+    {
+      "name": "traveler-lab",
+      "server": "traveler.example.com",
+      "user": "probe@example.com",
+      "password": "secret-password",
+      "profile": "iphone",
+      "mail": true,
+      "mail_wait_seconds": 60
+    },
+    {
+      "name": "traveler-prod",
+      "email": "probe@example.org",
+      "password_env": "TRAVELER_PROD_PASSWORD",
+      "profile": "iphone",
+      "provision": "auto"
+    }
+  ]
+}

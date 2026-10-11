@@ -1,0 +1,49 @@
+# Runs the mail client eas-client as a REST API with the page of the documentation (Swagger UI), from the image of the exporter.
+#
+#   cp deploy/eas-client-container.example.json client.json    edit the account, the token and the time zone
+#   chmod 600 client.json                                        it holds the password and the token: only you should read it
+#   ./build.sh                                                   build the image (it holds eas-client since this version)
+#   docker compose -f docker-compose.client.yml up -d
+#   docker compose -f docker-compose.client.yml logs -f
+#   https://127.0.0.1:8443/docs                                  the page (the browser warns about the micro CA until it trusts ca.crt); Authorize takes the token
+#   docker compose -f docker-compose.client.yml down
+#
+# The client reads only, until "write" and "send" in client.json are true. In the container it has to listen on 0.0.0.0, and then it
+# refuses to start without a token ("auth_token", or "auth_token_file" for a Docker secret). TLS is the default: the client makes a certificate in
+# /run/secrets/tls when there is none (the volume eas-tls keeps it, and the exporter of docker-compose.yml shares it), or uses the one that you
+# put there. "allow_http": true in client.json serves plain HTTP instead, for a proxy that terminates TLS. The port is only published on the
+# loopback interface of the host.
+
+services:
+  eas-client:
+    image: nashcom/eas-tools:latest
+    container_name: eas-client
+    hostname: eas-client
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    entrypoint: ["/usr/local/bin/eas-client"]
+    command: ["-config", "/etc/eas-tools/client.json", "serve"]
+    ports:
+      # host port on the left: change it if 8443 is taken (8443 is HTTPS: TLS is the default)
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./client.json:/etc/eas-tools/client.json:ro
+      - eas-client-data:/data    # client-state.json: the device of the client and its sync keys survive restarts
+      # the certificate, in the default place; the same volume as the exporter (docker-compose.yml), so that both use one CA and one certificate
+      - eas-tls:/run/secrets/tls
+    healthcheck:
+      # TLS is the default: 8443 speaks HTTPS only, and the health listener (/health only) runs on the loopback interface of the container, one port up
+      # (docs/TLS.md). With "allow_http": true in client.json the API is on 8080 (give "listen": ":8080" in a container) and the check is the one below.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8444/health"]
+      # test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+
+volumes:
+  eas-client-data:
+    name: eas-client-data
+  eas-tls:
+    name: eas-tls    # shared with the exporter (docker-compose.yml)

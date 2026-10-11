@@ -1,0 +1,32 @@
+{
+  "log_level": "info",
+  "log_format": "text",
+  "state_file": "/data/state.json",
+
+  "targets": [
+    {
+      "name": "traveler",
+      "server": "traveler.example.com",
+      "user": "probe@example.com",
+      "password": "secret-password",
+      "profile": "iphone"
+    }
+  ],
+
+  "mail_monitor": [
+    {
+      "name": "partner-domain",
+      "to": "echo@partner.example.net",
+      "account": "traveler",
+      "interval_seconds": 600,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "other-partner",
+      "to": "echo@other.example.org",
+      "server": "traveler.example.com",
+      "user": "probe-monitor@example.com",
+      "password": "another-secret-password"
+    }
+  ]
+}

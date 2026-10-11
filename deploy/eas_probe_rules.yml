@@ -1,0 +1,124 @@
+groups:
+  - name: eas_probe
+    rules:
+      - alert: ActiveSyncProbeFailed
+        expr: eas_probe_success{job="eas_probe"} == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "ActiveSync probe of {{ $labels.instance }} fails"
+
+      - alert: ActiveSyncLoginRefused
+        expr: eas_probe_auth_backoff{job=~"eas_probe.*"} == 1
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "ActiveSync login of {{ $labels.instance }} is refused; probing is paused to avoid a lockout"
+
+      - alert: ActiveSyncMailLost
+        expr: eas_probe_mail_lost{job="eas_probe_mail"} == 1
+        for: 30m
+        labels: {severity: critical}
+        annotations:
+          summary: "A mail sent through ActiveSync to {{ $labels.instance }} did not come back"
+
+      - alert: ActiveSyncMailCleanupFailed
+        expr: eas_probe_mail_cleanup_failed{job="eas_probe_mail"} == 1
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "The probe could not delete its test mail in {{ $labels.instance }}; test mails pile up in the Inbox"
+
+      - alert: ActiveSyncMailSlow
+        expr: eas_probe_mail_roundtrip_seconds{job="eas_probe_mail"} > 30
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "Mail round trip through {{ $labels.instance }} takes {{ $value | humanizeDuration }}"
+
+      - alert: ActiveSyncPingFailed
+        expr: eas_probe_success{job="eas_probe_ping"} == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "The held Ping of {{ $labels.instance }} fails"
+
+      - alert: ActiveSyncSlow
+        expr: eas_probe_step_duration_seconds{job="eas_probe", step="sync"} > 5
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "ActiveSync Sync of {{ $labels.instance }} takes {{ $value | humanizeDuration }}"
+
+      - alert: ActiveSyncProbeStale
+        expr: time() - eas_probe_timestamp_seconds{job="eas_probe"} > 600
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "No fresh ActiveSync probe result for {{ $labels.instance }}"
+
+      - alert: ActiveSyncExporterDown
+        expr: up{job="eas_probe_exporter"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "ActiveSync probe exporter is down"
+
+
+
+      # Only for an exporter that fetches its configuration from an https:// location: the exporter keeps running on
+      # the last good configuration when a reload fails, so these alerts are how you learn about it.
+      - alert: ActiveSyncConfigReloadFailing
+        expr: eas_probe_config_status{job="eas_probe_exporter"} == 1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "The ActiveSync exporter {{ $labels.instance }} cannot reload its configuration and runs on the last good one"
+
+      - alert: ActiveSyncConfigStale
+        expr: >
+          eas_probe_config_last_check_timestamp_seconds{job="eas_probe_exporter"} > 0
+          and time() - eas_probe_config_last_check_timestamp_seconds{job="eas_probe_exporter"} > 3600
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "The ActiveSync exporter {{ $labels.instance }} has not fetched its configuration for over an hour"
+
+  - name: eas_probe_exporter_tls
+    rules:
+      # Only exporters that serve HTTPS (tls_cert) publish these metrics. The certificate is renewed without a restart, so a
+      # warning 14 days before the end leaves time for the renewal tool to work and for someone to look when it did not.
+      - alert: ActiveSyncExporterCertificateExpires
+        expr: eas_probe_tls_certificate_not_after_timestamp_seconds{job="eas_probe_exporter"} - time() < 14 * 86400
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "The TLS certificate of the ActiveSync exporter {{ $labels.instance }} ends in {{ $value | humanizeDuration }}"
+
+      - alert: ActiveSyncExporterCertificateReloadFailed
+        expr: increase(eas_probe_tls_reload_errors_total{job="eas_probe_exporter"}[1h]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "A new TLS certificate of {{ $labels.instance }} could not be loaded; the old one is still served"
+
+  - name: eas_probe_mail_monitor
+    rules:
+      - alert: ActiveSyncMailMonitorLost
+        expr: eas_probe_mail_monitor_lost_in_window{window="300m"} > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Mail to {{ $labels.mail_monitor }} is lost: no answer, and it did not turn up late (delayed mails do not count)"
+
+      - alert: ActiveSyncMailMonitorSlow
+        expr: eas_probe_mail_monitor_rtt_seconds{window="15m"} > 120
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Mail round trip to {{ $labels.mail_monitor }} averages {{ $value | humanizeDuration }}"
+
+      - alert: ActiveSyncMailMonitorAccountDown
+        expr: eas_probe_mail_monitor_up == 0
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "The account of the mail monitor {{ $labels.mail_monitor }} cannot be used"

@@ -1,0 +1,27 @@
+# Used by ../test.sh: the test container next to a real nshtestherd coordinator.
+#
+#   NSHTESTHERD_IMAGE=ghcr.io/nashcom/nshtestherd:latest ./test.sh
+#
+# The generated accounts use the password of the mock server ("secret").
+
+services:
+  herd:
+    image: ${NSHTESTHERD_IMAGE:-nshtestherd:latest}
+    command: ["-bind", "0.0.0.0", "-port", "8788", "-generate", "10", "-password", "secret"]
+
+  tests:
+    image: nashcom/eas-tools-test
+    depends_on: [herd]
+    working_dir: /src
+    volumes:
+      - ..:/src:ro
+      - eas-tools-gocache:/gocache
+    environment:
+      GOMODCACHE: /gocache/mod
+      GOCACHE: /gocache/build
+      CGO_ENABLED: "0"
+      HERD_URL: http://herd:8788
+
+volumes:
+  eas-tools-gocache:
+    external: true     # created by ../test.sh; it keeps the Go toolchain and modules between runs

@@ -1,0 +1,13 @@
+{
+  "herd": "http://nshtestherd:8788",
+  "server": "traveler.example.com",
+  "clients": 50,
+  "devices": 1,
+  "profile": "iphone",
+  "log_level": "info",
+  "log_format": "text",
+  "name": "worker-1",
+  "state_file": "/data/eas-load-state.json",
+  "metrics": ":9117",
+  "report": "30s"
+}

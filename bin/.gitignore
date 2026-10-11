@@ -1,0 +1,2 @@
+# the programs are built into the platform folders (see compile.sh), never committed
+*.exe

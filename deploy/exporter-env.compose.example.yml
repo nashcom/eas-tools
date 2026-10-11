@@ -1,0 +1,37 @@
+# Runs the exporter with one target and its settings in an env file: no JSON config file is needed.
+# Start it from the project folder, so that the relative paths below are found:
+#
+#   cp deploy/exporter.example.env exporter.env     edit server, user and the password options
+#   docker compose -f deploy/exporter-env.compose.example.yml --project-directory . up -d
+#
+# exporter.env is personal and not committed. For several targets use the JSON config file variant, which is the
+# docker-compose.yml of the project.
+
+services:
+  eas-blackbox-exporter:
+    image: nashcom/eas-tools:latest
+    build:
+      context: .
+      dockerfile: container/dockerfile
+    container_name: eas-blackbox-exporter
+    hostname: eas-blackbox-exporter
+    restart: unless-stopped
+    env_file: exporter.env
+    ports:
+      # host port on the left: change it if it is taken. 9117 is HTTPS (TLS is the default), 9100 the metrics port (plain HTTP, open)
+      - "127.0.0.1:9117:9117"
+      - "127.0.0.1:9100:9100"
+    volumes:
+      - eas-tls:/run/secrets/tls    # the certificate: yours (tls.crt, tls.key), or the one that the exporter makes; the volume keeps it
+      - eas-exporter-data:/data    # state.json: registered devices survive restarts
+      # the password file, if exporter.env has EASEXPORTER_PASSWORD_FILE=/run/secrets/pw
+      #- ./pw.txt:/run/secrets/pw:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  eas-exporter-data:
+    name: eas-exporter-data
+  eas-tls:
+    name: eas-tls

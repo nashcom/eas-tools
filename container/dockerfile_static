@@ -1,0 +1,30 @@
+# ---- Build stage ----
+
+FROM cgr.dev/chainguard/go:latest AS builder
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN set -e; mkdir -p /tmp/out; for c in eas-blackbox-exporter eas-probe eas-load eas-client; do CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /tmp/out/$c ./cmd/$c; done
+
+# ---- Runtime stage: no shell, no package manager, only the binaries ----
+
+FROM cgr.dev/chainguard/static:latest
+
+COPY --from=builder /tmp/out/ /usr/local/bin/
+
+# The state directory has to be writable for the unprivileged user
+COPY --chown=1000:1000 --from=builder /dev/null /data/.keep
+
+# The certificate directory: the default place of tls.crt, tls.key and ca.crt (a Kubernetes secret or a volume is mounted on it). The program
+# makes a certificate there when there is none, if the directory is writable.
+COPY --chown=1000:1000 --from=builder /dev/null /run/secrets/tls/.keep
+
+USER 1000:1000
+VOLUME /data
+EXPOSE 9116 9117 9100
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD ["/usr/local/bin/eas-blackbox-exporter", "-health-check"]
+ENTRYPOINT ["/usr/local/bin/eas-blackbox-exporter"]

@@ -1,0 +1,42 @@
+{
+  "write": false,
+  "send": false,
+  "timeout": "60s",
+  "timezone": "Europe/Berlin",
+  "state_file": "/var/lib/eas-client/state.json",
+  "ca_file": "",
+  "log_level": "info",
+  "log_format": "text",
+
+  "listen": "127.0.0.1:8080",
+  "auth_token_file": "/run/secrets/eas-client-token",
+  "tls_cert": "",
+  "tls_key": "",
+  "tls_generate": false,
+  "tls_check_interval": "1m",
+  "listen_health": "",
+  "allow_from_health": [],
+  "docs": false,
+  "docs_ui": "",
+  "allow_from": [],
+  "allow_http": false,
+
+  "accounts": [
+    {
+      "name": "lab",
+      "server": "traveler.example.com",
+      "email": "alice@example.com",
+      "user": "alice@example.com",
+      "password_file": "/run/secrets/alice",
+      "time_zone": "Europe/Berlin"
+    },
+    {
+      "name": "test",
+      "server": "traveler.example.com",
+      "email": "bob@example.com",
+      "password_env": "BOB_PASSWORD",
+      "insecure": false,
+      "provision": "auto"
+    }
+  ]
+}

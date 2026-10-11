@@ -1,0 +1,54 @@
+# Runs the ActiveSync probe exporter standalone, with a JSON config file.
+#
+#   cp deploy/exporter-container.example.json config.json       edit the targets and the passwords
+#   chmod 600 config.json                                        it holds the passwords: only you should read it
+#   docker compose up -d                                        start (uses the image built by ./build.sh)
+#   docker compose up -d --build                                build the image first
+#   docker compose logs -f                                      follow the log
+#   docker compose down                                         stop and remove the container (the state volume stays)
+#
+# config.json is personal and not committed. A target keeps its password in the file ("password"), the simplest way: no
+# other file to manage. It can also read it from a separate file ("password_file", for example a Docker secret, see the
+# commented lines below) or from a variable ("password_env").
+# With one target and no config file, use the env file variant: deploy/exporter-env.compose.example.yml
+
+services:
+  eas-blackbox-exporter:
+    image: nashcom/eas-tools:latest
+    build:
+      context: .
+      dockerfile: container/dockerfile
+    container_name: eas-blackbox-exporter
+    hostname: eas-blackbox-exporter
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      # host port on the left: change it if it is taken. 9117 is HTTPS (TLS is the default), 9100 the metrics port: plain HTTP, open to every peer that
+      # reaches it unless allow_from_metrics restricts it, so it is published on the loopback interface of the host only
+      - "127.0.0.1:9117:9117"
+      - "127.0.0.1:9100:9100"
+    volumes:
+      - ./config.json:/etc/eas-tools/config.json:ro
+      - eas-exporter-data:/data    # state.json: registered devices survive restarts
+      # The certificate: tls.crt and tls.key, and ca.crt. Without them the exporter makes a certificate here with its own micro CA, which is for a
+      # try: the volume keeps it. A certificate of your own goes in the same place (a bind mount instead of the volume, or a secret).
+      - eas-tls:/run/secrets/tls
+    # The password of a config.json with one target can come from a variable instead of the file ("password"). With
+    # several targets add EASEXPORTER_TARGET: <name> for the one it belongs to.
+    #environment:
+    #  EASEXPORTER_PASSWORD: the-password
+    # password files as Docker secrets: name them in "password_file" as /run/secrets/<name>
+    #secrets:
+    #  - traveler_prod_password
+
+#secrets:
+#  traveler_prod_password:
+#    file: ./secrets/traveler_prod_password
+
+volumes:
+  eas-exporter-data:
+    name: eas-exporter-data
+  eas-tls:
+    name: eas-tls    # shared with the client (docker-compose.client.yml): the CA and the certificate are made once

@@ -1,0 +1,12 @@
+{
+  "server": "traveler.example.com",
+  "user": "probe@example.com",
+  "password": "secret-password",
+  "profile": "iphone",
+  "log_level": "info",
+  "log_format": "text",
+  "state_file": "probe-state.json",
+  "mail": true,
+  "mail_wait_seconds": 60,
+  "ping": 60
+}

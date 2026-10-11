@@ -1,0 +1,15 @@
+# Only what the Go build needs goes into the build context; everything else
+# (lab configs, state, traces, secrets, scripts, docs) can never end up in an image.
+*
+!go.mod
+!go.sum
+!client
+!cmd
+!exporter
+!herd
+!internal
+!load
+!mailmonitor
+!probe
+!container
+**/*_test.go

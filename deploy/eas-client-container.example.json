@@ -1,0 +1,21 @@
+{
+  "auth_token": "change-me-to-a-long-random-text",
+  "docs": true,
+  "allow_from": [],
+
+  "write": false,
+  "send": false,
+
+  "timezone": "Europe/Berlin",
+  "state_file": "/data/client-state.json",
+  "log_level": "info",
+
+  "accounts": [
+    {
+      "name": "lab",
+      "server": "traveler.example.com",
+      "email": "alice@example.com",
+      "password": "the-password"
+    }
+  ]
+}
