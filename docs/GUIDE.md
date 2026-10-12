@@ -21,7 +21,7 @@ Contents: [The parts](#the-parts) | [Specifying a Traveler server](#specifying-a
   Grafana                │   /probe?target=NAME              │  accounts, commands, status
                          │                                   │
                          │                                   ▼   register / status / command
-  eas-probe (CLI) ────────┤                               eas-load (worker, N users x M devices)
+  eas-probe (CLI) ───────┤                                eas-load (worker, N users x M devices)
    one-shot probe        │                                   │
                          ▼                                   ▼
                   ┌───────────────────────────────────────────────┐

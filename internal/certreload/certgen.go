@@ -308,26 +308,6 @@ func makeLeaf(o GenerateOptions, names []string, key crypto.Signer, root *x509.C
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), nil
 }
 
-// writeAtomic writes a file so that it is there complete or not at all.
-func writeAtomic(path string, data []byte, perm os.FileMode) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-"+filepath.Base(path)+"-")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Chmod(tmp.Name(), perm); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
-}
-
 // certificateNames are the names of the generated certificate. The loopback names (localhost, 127.0.0.1, ::1) are always in, so that a
 // check on the machine itself works. Without names of the administrator the host name is added; with names it is not, they replace it: in
 // a container the host name is an id that nobody uses, and the name that the clients use is what has to be in the certificate.

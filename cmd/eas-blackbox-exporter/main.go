@@ -135,6 +135,11 @@ func run() int {
 	// TLS: the pair is held by a store that loads a changed pair while the listener runs
 	var certs *certreload.Store
 	if cfg.TLSCert != "" {
+		// a key and no certificate: the certificate host has the certificate of the key (before Prepare, which would not make one next to a key of ours)
+		if err := certreload.FetchFirst(ctx, certreload.UpdateOptions{From: cfg.TLSUpdateFrom, Name: cfg.TLSUpdateName}, cfg.TLSCert, cfg.TLSKey, log); err != nil {
+			log.Error("tls", "error", err)
+			return 2
+		}
 		if cfg.MakesCertificate() {
 			o := certreload.GenerateOptions{CertFile: cfg.TLSCert, KeyFile: cfg.TLSKey, Names: cfg.TLSNames, LeafDays: cfg.TLSValidDays}
 			if err := certreload.Prepare(o, cfg.TLSAuto, log); err != nil {
@@ -148,6 +153,13 @@ func run() int {
 		}
 		srv.SetTLS(certs)
 		httpSrv.TLSConfig = certs.TLSConfig()
+		if cfg.TLSUpdateFrom != "" {
+			if err := certs.SetUpdate(certreload.UpdateOptions{From: cfg.TLSUpdateFrom, Name: cfg.TLSUpdateName, Every: time.Duration(cfg.TLSUpdateSeconds) * time.Second}); err != nil {
+				log.Error("tls", "error", err)
+				return 2
+			}
+			log.Info("TLS certificate renewal: the certificate host is asked", "from", cfg.TLSUpdateFrom, "name", cfg.TLSUpdateName, "every", time.Duration(cfg.TLSUpdateSeconds)*time.Second)
+		}
 		go certs.Watch(ctx, time.Duration(cfg.TLSCheckSeconds)*time.Second)
 	}
 
@@ -533,7 +545,7 @@ func reloadLoop(ctx context.Context, cs *configStart, srv *exporter.Server, cert
 		case req := <-cs.trigger:
 			log.Info("the configuration is checked on request", "source", source)
 			req.reply <- check()
-			certs.Check(ctx)
+			certs.CheckNow(ctx) // on request the certificate host is asked as well, whatever the time since the last time
 		}
 	}
 }
@@ -596,6 +608,7 @@ func onSIGHUP(ctx context.Context, cs *configStart, certs *certreload.Store, log
 		case <-hup:
 			if certs != nil { // the TLS certificate and key are looked at again as well
 				log.Info("SIGHUP: reloading the TLS certificate")
+				certs.Update(ctx) // a renewed certificate of the certificate host, if there is one, is in the file then
 				_, _ = certs.Reload()
 			}
 			rctx, cancel := context.WithTimeout(ctx, time.Minute)

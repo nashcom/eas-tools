@@ -4,6 +4,24 @@ Newest version first. Every change is noted here with the change itself. All the
 `Version` in `probe/profile.go`). `push-release.sh` refuses to tag a version that has no section here, and the release workflow makes the text of
 the GitHub release from it.
 
+## 0.9.1
+
+**A renewed TLS certificate can be fetched from a certificate host.** The exporter and the client ask a host that keeps the certificates (the
+Domino CertMgr, for one) for the certificate of their own name, and take it when it is better than the one they have.
+
+- **Settings:** `tls_update_from` (`host:port` of the certificate host; off when empty), `tls_update_name` and `tls_update_interval_seconds`
+  (default 3600) for the exporter; `-tls-update-from`, `-tls-update-name` and `-tls-update-interval` (default 1h) for the client.
+- **The name** that is asked for (SNI) is `tls_update_name`, or else the host name of the machine; it is never taken from a certificate, and
+  the host answers with the best match, a wildcard certificate included.
+- **What is taken:** a certificate that is for the private key in use, valid now, for the name, and newer than the one in use. One that does
+  not meet all four is not taken (another key is a warning). The certificate file is replaced atomically; the key file is never touched.
+- **When:** at the start, then every interval, and at once on `POST /config/reload` of the exporter and on `SIGHUP`. The log says at the
+  info level that the host was asked, also when there is nothing new.
+- **A key and no certificate:** the certificate is fetched before anything else, and the start fails with the reason when the host has none
+  that fits.
+- The helpers (`FetchChain`, `Evaluate`, `AskName` and others) are in `internal/certreload/certmgr.go` and depend on the standard library
+  only, so that the file can be reused. Described in [docs/TLS.md](docs/TLS.md#from-a-certificate-host).
+
 ## 0.9.0
 
 **The first version of eas-tools, an ActiveSync toolbox for HCL Traveler.** Three deliverables and two supporting tools, all with this version.

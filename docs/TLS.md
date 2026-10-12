@@ -25,17 +25,20 @@ certificate of your own in that directory (or name it with `tls_cert` and `tls_k
 
 ## Settings
 
-| Exporter (`config.json`, `EASEXPORTER_`)       | Client (flag, `client.json`, `EASCLIENT_`)                 | Meaning                                                                                                                                                                      |
-| ---------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tls_cert`                                     | `-tls-cert`, `tls_cert`                                    | the certificate file in PEM: the server certificate first, then the chain. Default: `/run/secrets/tls/tls.crt`                                                               |
-| `tls_key`                                      | `-tls-key`, `tls_key`                                      | its private key in PEM. Default: `/run/secrets/tls/tls.key`                                                                                                                  |
-| `tls_generate`                                 | `-tls-generate`, `tls_generate`                            | make a CA and a certificate when neither file is there, at the files that you name; not needed for the default ones, which are made anyway                                   |
-| `tls_valid_days` (default `365`, 1 to 3650)    | `-tls-valid-days`, `tls_valid_days`                        | how long a certificate that the micro CA makes is valid; it is made again at every start, and one of yours is not touched; never longer than the CA (ten years)              |
-| `tls_names` (list, comma separated in the env) | `-tls-names` (repeatable), `tls_names`                     | names of the generated certificate: DNS names and IP addresses, added to `localhost`, `127.0.0.1` and `::1`; they replace the host name, which is in when no names are given |
-| `tls_check_interval_seconds` (default `60`)    | `-tls-check-interval` (default `1m`), `tls_check_interval` | how often the files are looked at                                                                                                                                            |
-| `allow_http`                                   | `-allow-http`, `allow_http`                                | serve everything over plain HTTP without a certificate, for a proxy that terminates TLS; an error together with `tls_cert`                                                   |
-| `listen_metrics`                               | `-listen-health`, `listen_health` (TLS only)               | the second port: exporter, the metrics port (always, open); client, the `/health` port (with TLS, loopback). Default: the port after `listen`                                |
-| `allow_from_metrics` (list)                    | `-allow-from-health` (repeatable), `allow_from_health`     | the peers that may connect to it; the client's health port needs the list when it is not on loopback                                                                         |
+| Exporter (`config.json`, `EASEXPORTER_`)       | Client (flag, `client.json`, `EASCLIENT_`)                   | Meaning                                                                                                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tls_cert`                                     | `-tls-cert`, `tls_cert`                                      | the certificate file in PEM: the server certificate first, then the chain. Default: `/run/secrets/tls/tls.crt`                                                               |
+| `tls_key`                                      | `-tls-key`, `tls_key`                                        | its private key in PEM. Default: `/run/secrets/tls/tls.key`                                                                                                                  |
+| `tls_generate`                                 | `-tls-generate`, `tls_generate`                              | make a CA and a certificate when neither file is there, at the files that you name; not needed for the default ones, which are made anyway                                   |
+| `tls_valid_days` (default `365`, 1 to 3650)    | `-tls-valid-days`, `tls_valid_days`                          | how long a certificate that the micro CA makes is valid; it is made again at every start, and one of yours is not touched; never longer than the CA (ten years)              |
+| `tls_names` (list, comma separated in the env) | `-tls-names` (repeatable), `tls_names`                       | names of the generated certificate: DNS names and IP addresses, added to `localhost`, `127.0.0.1` and `::1`; they replace the host name, which is in when no names are given |
+| `tls_check_interval_seconds` (default `60`)    | `-tls-check-interval` (default `1m`), `tls_check_interval`   | how often the files are looked at                                                                                                                                            |
+| `tls_update_from`                              | `-tls-update-from`, `tls_update_from`                        | `host:port` of a certificate host (the Domino CertMgr, for one) that is asked for a renewed certificate; off when empty                                                      |
+| `tls_update_name`                              | `-tls-update-name`, `tls_update_name`                        | the name that the certificate host is asked for (SNI). Default: the host name of this machine, wildcard certificates included                                                |
+| `tls_update_interval_seconds` (default `3600`) | `-tls-update-interval` (default `1h`), `tls_update_interval` | how often the certificate host is asked; it is asked at the start, too                                                                                                       |
+| `allow_http`                                   | `-allow-http`, `allow_http`                                  | serve everything over plain HTTP without a certificate, for a proxy that terminates TLS; an error together with `tls_cert`                                                   |
+| `listen_metrics`                               | `-listen-health`, `listen_health` (TLS only)                 | the second port: exporter, the metrics port (always, open); client, the `/health` port (with TLS, loopback). Default: the port after `listen`                                |
+| `allow_from_metrics` (list)                    | `-allow-from-health` (repeatable), `allow_from_health`       | the peers that may connect to it; the client's health port needs the list when it is not on loopback                                                                         |
 
 - `tls_cert` and `tls_key` go together. One without the other is an error at the start.
 - `tls_generate` is for files that you name; it excludes `allow_http` and a loopback `listen`, where there is no TLS.
@@ -211,6 +214,35 @@ restarted, no connection is dropped.
   with the same cheap check. It does nothing when the files did not change.
 
 The client has no configuration reload, so it has the watcher and `SIGHUP`.
+
+### From a certificate host
+
+When the certificates are made somewhere else, the program can fetch the renewed one itself. Set `tls_update_from` (client
+`-tls-update-from`) to the `host:port` of the host that keeps the certificates, for example the Domino CertMgr:
+
+```
+"tls_update_from": "certmgr.example.com:443"
+```
+
+- **The ask.** The program connects to the host with its own name as SNI: `tls_update_name` when it is set, otherwise the **host name** of
+  the machine, always the same name, never one taken from a certificate. The host answers with the best match for that name (a wildcard
+  certificate as well) and the program takes it. The connection itself is not verified: the checks below decide. When the host name is not
+  the name in the certificate (a short name, a container id), set `tls_update_name`.
+- **What is taken.** The certificate has to be **for the private key in use**, valid now, for the name, and **newer** (it starts later
+  than the one in use). A certificate that does not meet all four is not taken; a certificate for another key is a warning, once. So the
+  renewal on the host has to keep the key, and a wrong certificate on the host can never replace a working one. A chain that does not
+  verify against the system roots (a private CA) is a warning, not a reason to refuse: the key fits.
+- **What happens then.** The certificate file (`tls_cert`) is replaced atomically with the certificate and the chain that the host sent. The
+  key file is never touched. The look at the files that follows is the one described above: it loads the new certificate.
+- **When.** At the start, then every `tls_update_interval_seconds` (default one hour: a certificate changes every few months, and the
+  files are looked at every minute anyhow). A check on request asks at once and does not wait for the interval: `POST /config/reload`
+  of the exporter and `SIGHUP`.
+- **A key and no certificate.** When `tls_key` is there and `tls_cert` is not, the program asks the host for the certificate of that key
+  before it does anything else, with the same name as above. Without an answer that fits the key there is nothing to serve, and the start
+  fails with the reason.
+- **A host that does not answer** changes nothing: the certificate in use stays, and the problem is a warning in the log once, and
+  when it is over, a line that says so.
+- Not for the certificate of the micro CA: it is made again at every start, there is nothing to renew.
 
 A change of the **file names** (`tls_cert`, `tls_key`), of the switch to HTTPS or of an address (`listen`, `listen_metrics`) is not
 applied by a reload; `allow_from` and `allow_from_metrics` are. The exporter says so in

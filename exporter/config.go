@@ -13,6 +13,7 @@ import (
 	"github.com/nashcom/eas-tools/internal/logging"
 	"github.com/nashcom/eas-tools/probe"
 	"log/slog"
+	"net"
 	"os"
 	"reflect"
 	"regexp"
@@ -41,6 +42,13 @@ type Config struct {
 	TLSGenerate     bool     `json:"tls_generate"`
 	TLSNames        []string `json:"tls_names"`
 	TLSCheckSeconds int      `json:"tls_check_interval_seconds"`
+	// TLSUpdateFrom is the host and port ("certmgr.example.com:443") that is asked for a renewed certificate: the program connects with
+	// TLSUpdateName (default: the host name of this machine, never a name from a certificate) as SNI, and takes the certificate it gets when it is for the
+	// key in use, is valid and is newer. It writes tls_cert; the key is never touched. It is asked at the start, every
+	// TLSUpdateSeconds (default 3600), and when the configuration is checked on request or on SIGHUP.
+	TLSUpdateFrom    string `json:"tls_update_from"`
+	TLSUpdateName    string `json:"tls_update_name"`
+	TLSUpdateSeconds int    `json:"tls_update_interval_seconds"`
 	// TLSValidDays is how long a certificate that the micro CA makes is valid (default 365, from 1 to 3650). It is made again at every start. It does
 	// not apply to a certificate of your own.
 	TLSValidDays int `json:"tls_valid_days"`
@@ -236,6 +244,17 @@ func LoadConfigBytes(raw []byte, name string, environ []string) (*Config, error)
 	}
 	if c.TLSCheckSeconds <= 0 {
 		c.TLSCheckSeconds = 60
+	}
+	if c.TLSUpdateSeconds <= 0 {
+		c.TLSUpdateSeconds = int(certreload.DefaultUpdateEvery / time.Second)
+	}
+	if c.TLSUpdateFrom != "" {
+		if host, port, err := net.SplitHostPort(c.TLSUpdateFrom); err != nil || host == "" || port == "" {
+			return nil, fmt.Errorf("tls_update_from: %q is not host:port", c.TLSUpdateFrom)
+		}
+		if c.AllowHTTP {
+			return nil, errors.New("tls_update_from renews the certificate of a listener that has TLS: it excludes allow_http")
+		}
 	}
 	if c.TLSValidDays == 0 {
 		c.TLSValidDays = certreload.DefaultLeafDays

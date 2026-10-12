@@ -124,6 +124,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, environ func(
 		tlsGen    = fs.Bool("tls-generate", false, "serve: make a small CA and a certificate for the listener when -tls-cert and -tls-key do not exist yet (they are never overwritten; the CA is kept next to the certificate as ca.crt and ca.key)")
 		tlsDays   = fs.Int("tls-valid-days", certreload.DefaultLeafDays, "serve: how many days a certificate that the micro CA of the program makes is valid (1 to 3650); it is made again at every start, and a certificate of your own is not touched")
 		tlsCheck  = fs.Duration("tls-check-interval", time.Minute, "serve: how often the certificate and key files are looked at; a changed pair is loaded without a restart (also on SIGHUP)")
+		tlsFrom   = fs.String("tls-update-from", "", "serve: host:port of a certificate host (such as the Domino CertMgr) that is asked for a renewed certificate with the name as SNI: it is taken when it is for the key in use, valid and newer, and written to -tls-cert (the key is never touched). Asked at the start, every -tls-update-interval, and on SIGHUP")
+		tlsName   = fs.String("tls-update-name", "", "serve: the name that the certificate host is asked for (SNI); default: the host name of this machine (never taken from a certificate: the certificate host answers with the best match, wildcards included)")
+		tlsEvery  = fs.Duration("tls-update-interval", certreload.DefaultUpdateEvery, "serve: how often the certificate host is asked for a renewed certificate (it is asked at the start as well)")
 		docs      = fs.Bool("docs", false, "serve: also the page /docs (Swagger UI) where the requests of the API can be tried, and /openapi.json is there always")
 		docsUI    = fs.String("docs-ui", "", "serve: where the browser loads Swagger UI from for /docs: the URL of a directory with swagger-ui.css and swagger-ui-bundle.js (default: the CDN jsDelivr, in the version pinned in the program, with integrity hashes)")
 		traceFile = fs.String("trace", "", "append every request and response, WBXML decoded, to this file (no password or cookies)")
@@ -299,7 +302,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, environ func(
 		if *tlsCert != "" && *allowHTTP {
 			return fail("-allow-http and -tls-cert exclude each other: a listener that has TLS speaks nothing else")
 		}
-		return serve(m, store, logger, serveOptions{addr: defaultListen(*listen, *allowHTTP), token: token, cert: *tlsCert, key: *tlsKey, timeout: *timeout, docs: *docs, docsUI: ui, allow: acl,
+		if *tlsFrom != "" {
+			if host, port, err := net.SplitHostPort(*tlsFrom); err != nil || host == "" || port == "" {
+				return fail("-tls-update-from: %q is not host:port", *tlsFrom)
+			}
+			if *allowHTTP {
+				return fail("-tls-update-from renews the certificate of a listener that has TLS: it excludes -allow-http")
+			}
+		}
+		return serve(m, store, logger, serveOptions{tlsUpdateFrom: *tlsFrom, tlsUpdateName: *tlsName, tlsUpdateEvery: *tlsEvery, addr: defaultListen(*listen, *allowHTTP), token: token, cert: *tlsCert, key: *tlsKey, timeout: *timeout, docs: *docs, docsUI: ui, allow: acl,
 			tlsGenerate: *tlsGen, tlsNames: tlsNames, tlsCheck: *tlsCheck, tlsDays: *tlsDays, allowHTTP: *allowHTTP, healthAddr: *listenHealth, allowHealth: aclHealth}, stderr)
 	}
 
@@ -534,6 +545,9 @@ type serveOptions struct {
 	tlsGenerate            bool
 	tlsNames               []string
 	tlsCheck               time.Duration
+	tlsUpdateFrom          string // a certificate host that is asked for a renewed certificate
+	tlsUpdateName          string
+	tlsUpdateEvery         time.Duration
 	tlsDays                int
 	healthAddr             string      // with TLS: the listener of /health next to HTTPS; default loopback, the next port
 	allowHTTP              bool        // everything over plain HTTP, chosen on purpose (a proxy that terminates TLS)
@@ -584,6 +598,11 @@ func serve(m *client.Manager, store *probe.Store, log *slog.Logger, o serveOptio
 	// TLS: the pair is held by a store that loads a changed pair while the listener runs
 	var certs *certreload.Store
 	if o.cert != "" {
+		// a key and no certificate: the certificate host has the certificate of the key (before Prepare, which would not make one next to a key of ours)
+		if err := certreload.FetchFirst(context.Background(), certreload.UpdateOptions{From: o.tlsUpdateFrom, Name: o.tlsUpdateName}, o.cert, o.key, log); err != nil {
+			fmt.Fprintln(stderr, "eas-client:", err)
+			return 2
+		}
 		if auto || o.tlsGenerate {
 			if err := certreload.Prepare(certreload.GenerateOptions{CertFile: o.cert, KeyFile: o.key, Names: o.tlsNames, LeafDays: o.tlsDays}, auto, log); err != nil {
 				fmt.Fprintln(stderr, "eas-client:", err)
@@ -646,6 +665,13 @@ func serve(m *client.Manager, store *probe.Store, log *slog.Logger, o serveOptio
 	defer stop()
 	if certs != nil {
 		srv.TLSConfig = certs.TLSConfig()
+		if o.tlsUpdateFrom != "" {
+			if err := certs.SetUpdate(certreload.UpdateOptions{From: o.tlsUpdateFrom, Name: o.tlsUpdateName, Every: o.tlsUpdateEvery}); err != nil {
+				fmt.Fprintln(stderr, "eas-client:", err)
+				return 1
+			}
+			log.Info("TLS certificate renewal: the certificate host is asked", "from", o.tlsUpdateFrom, "name", o.tlsUpdateName, "every", o.tlsUpdateEvery)
+		}
 		go certs.Watch(ctx, o.tlsCheck)
 		go func() { // SIGHUP: load the certificate files now
 			hup := make(chan os.Signal, 1)
@@ -657,6 +683,7 @@ func serve(m *client.Manager, store *probe.Store, log *slog.Logger, o serveOptio
 					return
 				case <-hup:
 					log.Info("SIGHUP: reloading the TLS certificate")
+					certs.Update(ctx) // a renewed certificate of the certificate host, if there is one, is in the file then
 					_, _ = certs.Reload()
 				}
 			}

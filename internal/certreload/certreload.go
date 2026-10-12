@@ -33,6 +33,11 @@ type Store struct {
 	seen, tried       fingerprint
 	reloads, failures atomic.Int64
 	checking          atomic.Bool // a Check is running
+
+	upd           *UpdateOptions // ask a certificate host for a renewed certificate (SetUpdate)
+	lastUpdate    time.Time      // the last time the host was asked
+	updateProblem string         // what went wrong the last time, to log a problem once
+	updates       atomic.Int64   // certificates fetched from the host
 }
 
 type loaded struct {
@@ -145,6 +150,8 @@ func (s *Store) Check(ctx context.Context) bool {
 	}
 	defer s.checking.Store(false)
 
+	s.update(ctx) // a renewed certificate of the host is written to the file first, the look at the files below then loads it
+
 	s.mu.Lock()
 	fp, ok := s.stat()
 	skip := !ok || fp == s.seen || fp == s.tried
@@ -169,6 +176,12 @@ func (s *Store) Watch(ctx context.Context, interval time.Duration) {
 	}
 	t := time.NewTicker(interval)
 	defer t.Stop()
+	s.mu.Lock()
+	asks := s.upd != nil
+	s.mu.Unlock()
+	if asks { // the certificate host is asked at the start, not after the first interval
+		s.Check(ctx)
+	}
 	for {
 		select {
 		case <-ctx.Done():
