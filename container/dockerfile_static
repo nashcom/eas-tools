@@ -12,13 +12,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN set -e; mkdir -p /tmp/out; for c in eas-blackbox-exporter eas-probe eas-load eas-client; do CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /tmp/out/$c ./cmd/$c; done
+RUN set -e; mkdir -p /tmp/out; for c in eas-blackbox-exporter eas-probe eas-load eas-client eas-mcp; do CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /tmp/out/$c ./cmd/$c; done
 
 # ---- Runtime stage: no shell, no package manager, only the binaries ----
 
 FROM cgr.dev/chainguard/static:latest
 
 COPY --from=builder /tmp/out/ /usr/local/bin/
+# the license texts of the libraries in the programs (scripts/licenses.sh makes them)
+COPY third_party/licenses/ /usr/share/licenses/eas-tools/
 
 # The state directory has to be writable for the unprivileged user
 COPY --chown=1000:1000 --from=builder /dev/null /data/.keep

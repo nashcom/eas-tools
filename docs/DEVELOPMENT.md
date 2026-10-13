@@ -102,12 +102,14 @@ cmd/eas-blackbox-exporter/   Prometheus blackbox-style HTTP exporter (the contai
 cmd/eas-load/                 nshtestherd worker generating ActiveSync load
 cmd/eas-mock-server/         mock ActiveSync server for demos and tests
 cmd/eas-client/              mail, calendar and contact client: command line and REST API (serve)
+cmd/eas-mcp/                 MCP server of the mailboxes for AI clients (stdio), see docs/MCP.md
 client/                     the operations of the client and the REST API (route table, OpenAPI document, Swagger UI page)
 herd/                        client for the nshtestherd coordinator protocol
 load/                        worker: client state machine, jobs, statistics
 exporter/                    config file, /probe, /metrics, /health, result cache
 mailmonitor/                  mail monitor: mail to an address outside, round-trip time, one thread for all targets
 internal/easmockserver/      the mock ActiveSync server as a package (tests and cmd/eas-mock-server)
+internal/clientcfg/          the options and the accounts that eas-client and eas-mcp have in common
 internal/testherd/           a tiny in-process coordinator for the Go unit tests
 internal/certreload/        the certificate of a listener: reload while running, the micro CA, the log of the start
 internal/ipacl/             allow lists of addresses, networks and ranges (allow_from)
@@ -129,6 +131,7 @@ README.md                    the project: the three deliverables, the jumpstart 
 docs/EXPORTER.md            deliverable 1: the Prometheus blackbox exporter
 docs/LOADTEST.md            deliverable 2: eas-load, the coordinator, the round trip script
 docs/CLIENT.md              deliverable 3: eas-client, command line and REST API
+docs/MCP.md                 eas-mcp, the mailbox for AI clients
 docs/PROBE.md               eas-probe, the probe on the command line
 docs/MOCKSERVER.md          eas-mock-server, the stand-in server
 docs/GUIDE.md                how the tools work together, server setup, walk-throughs

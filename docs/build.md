@@ -27,9 +27,9 @@ docker compose up -d
 
 # Overview
 
-The image contains three programs: the exporter (`eas-blackbox-exporter`, the entry point), the command line probe
-(`eas-probe`) and the load worker (`eas-load`). The two others are in `/usr/local/bin` and can be started with
-`--entrypoint`.
+The image contains five programs: the exporter (`eas-blackbox-exporter`, the entry point), the command line probe
+(`eas-probe`), the load worker (`eas-load`), the mail client (`eas-client`) and the MCP server (`eas-mcp`, [MCP.md](MCP.md)). The
+four others are in `/usr/local/bin` and can be started with `--entrypoint`.
 
 Each variant uses a **multi-stage build**:
 

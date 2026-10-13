@@ -12,13 +12,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN set -e; mkdir -p /tmp/out; for c in eas-blackbox-exporter eas-probe eas-load eas-client; do CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /tmp/out/$c ./cmd/$c; done
+RUN set -e; mkdir -p /tmp/out; for c in eas-blackbox-exporter eas-probe eas-load eas-client eas-mcp; do CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /tmp/out/$c ./cmd/$c; done
 
 # ---- Runtime stage ----
 
 FROM cgr.dev/chainguard/wolfi-base
 
 COPY --from=builder /tmp/out/ /usr/local/bin/
+# the license texts of the libraries in the programs (scripts/licenses.sh makes them)
+COPY third_party/licenses/ /usr/share/licenses/eas-tools/
 RUN mkdir -p /data /etc/eas-tools /run/secrets/tls && chown 1000:1000 /data /run/secrets/tls
 
 USER 1000:1000

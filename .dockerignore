@@ -12,4 +12,5 @@
 !mailmonitor
 !probe
 !container
+!third_party/licenses
 **/*_test.go

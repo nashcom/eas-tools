@@ -9,7 +9,7 @@
 
 CONTAINER_CMD=docker
 GO_IMAGE=golang:alpine
-PROGRAMS="eas-blackbox-exporter eas-probe eas-load eas-mock-server eas-client"
+PROGRAMS="eas-blackbox-exporter eas-probe eas-load eas-mock-server eas-client eas-mcp"
 PLATFORMS=""
 
 usage()

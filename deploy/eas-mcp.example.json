@@ -1,0 +1,18 @@
+{
+  "send": false,
+  "send_domains": [],
+  "timeout": "60s",
+  "log_level": "info",
+  "log_format": "text",
+
+  "accounts": [
+    {
+      "name": "lab",
+      "server": "traveler.example.com",
+      "email": "alice@example.com",
+      "user": "alice@example.com",
+      "profile": "iphone",
+      "password_file": "/run/secrets/alice"
+    }
+  ]
+}

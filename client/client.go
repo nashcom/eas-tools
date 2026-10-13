@@ -23,6 +23,9 @@ type Options struct {
 	// AllowSend lets the client send mail. It is a switch of its own: a mail leaves the mailbox and cannot be taken back,
 	// and AllowWrite does not imply it.
 	AllowSend bool
+	// SendDomains limits the domains that mail is sent to (send, reply, forward): "example.com" is that domain, "*.example.com" every domain
+	// below it. Empty means no restriction.
+	SendDomains []string
 	// Store keeps the device state (policy key, sync keys, folders); nil keeps it in memory only.
 	Store *probe.Store
 	// Logger receives the log of the sessions; nil discards it.
@@ -382,6 +385,9 @@ func (m *Manager) Send(ctx context.Context, account string, r SendRequest) (*Sen
 	if len(r.To) == 0 {
 		return nil, newError(http.StatusBadRequest, "recipient_required", "at least one recipient (to) is required")
 	}
+	if err := m.checkRecipients(r.To, r.Cc); err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(r.Subject) == "" {
 		return nil, newError(http.StatusBadRequest, "subject_required", "a subject is required")
 	}
@@ -472,6 +478,9 @@ func (m *Manager) Reply(ctx context.Context, account, folder, id string, r Reply
 	if err := m.needSend(); err != nil {
 		return nil, err
 	}
+	if err := m.checkReplyRecipients(ctx, account, folder, id, r.All); err != nil {
+		return nil, err
+	}
 	return m.smart(ctx, account, folder, id, "reply", func(s *probe.Session, f probe.Folder) (*probe.SmartResult, error) {
 		return s.ReplyMail(ctx, f.ID, id, probe.ReplyOptions{All: r.All, Body: r.Body, SkipSaveInSent: r.SaveInSent != nil && !*r.SaveInSent})
 	})
@@ -485,6 +494,9 @@ func (m *Manager) Forward(ctx context.Context, account, folder, id string, r For
 	}
 	if len(r.To) == 0 {
 		return nil, newError(http.StatusBadRequest, "recipient_required", "at least one recipient (to) is required")
+	}
+	if err := m.checkRecipients(r.To, r.Cc); err != nil {
+		return nil, err
 	}
 	return m.smart(ctx, account, folder, id, "forward", func(s *probe.Session, f probe.Folder) (*probe.SmartResult, error) {
 		return s.ForwardMail(ctx, f.ID, id, probe.ForwardOptions{To: r.To, Cc: r.Cc, Body: r.Body, SkipSaveInSent: r.SaveInSent != nil && !*r.SaveInSent})

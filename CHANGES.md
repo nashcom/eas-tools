@@ -4,6 +4,24 @@ Newest version first. Every change is noted here with the change itself. All the
 `Version` in `probe/profile.go`). `push-release.sh` refuses to tag a version that has no section here, and the release workflow makes the text of
 the GitHub release from it.
 
+## 0.9.2
+
+**eas-mcp, a first experimental addition: the mailboxes for AI clients.** `eas-mcp` is an [MCP](https://modelcontextprotocol.io) server on
+the code of `eas-client`. It is **experimental**: the tools, the options and the defaults can still change, and sending mail has been tried
+against the mock server only. See [docs/MCP.md](docs/MCP.md).
+
+- **Tools:** `accounts`, `server_info`, `list_folders`, `list_messages` and `get_message` (read only), and `send_message`, which exists only
+  with `-send`. Changing a mailbox, reply, forward, calendar and contacts are not tools yet.
+- **Transports:** http is the default (the endpoint `/mcp` and `/health` on `8445`, HTTPS; `8081` plain HTTP with `-allow-http`; `8446` the
+  health port), for a container. `-transport stdio` is for a client that starts the program. A bearer token is optional.
+- **The same configuration as eas-client:** the options, the config file with `accounts` and the `EASCLIENT_` variables are shared (the new
+  package `internal/clientcfg`). An account of the file that names no password uses `EASCLIENT_PASSWORD`.
+- **`-send-domains`** (`send_domains`) limits the domains that mail is sent to, for send, reply and forward. It is in the client manager, so
+  `eas-client` and its REST API have it too (`403 recipient_not_allowed`). Without it there is no limit.
+- **Licenses:** the license texts of the libraries are in `third_party/licenses/` and in the images (`/usr/share/licenses/eas-tools`), the
+  list is in [THIRD_PARTY.md](THIRD_PARTY.md); `scripts/licenses.sh` makes them.
+- The images contain `eas-mcp`; `compile.sh` builds it.
+
 ## 0.9.1
 
 **A renewed TLS certificate can be fetched from a certificate host.** The exporter and the client ask a host that keeps the certificates (the

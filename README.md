@@ -46,6 +46,8 @@ docker pull ghcr.io/nashcom/eas-tools:latest   # or the finished image, for amd6
 | `9100` | `eas-blackbox-exporter` | the metrics port: plain HTTP, open, `/metrics` and `/health` only                                   |
 | `8443` | `eas-client`            | HTTPS: the REST API, `/openapi.json`, `/docs` (the default; `8444` is its health port, on loopback) |
 | `8080` | `eas-client`            | plain HTTP, with `-allow-http`: on `127.0.0.1` unless you name an address                           |
+| `8445` | `eas-mcp`               | HTTPS: the MCP endpoint `/mcp` with `-transport http` (`8446` is its health port, on loopback)      |
+| `8081` | `eas-mcp`               | plain HTTP, with `-allow-http`: on `127.0.0.1` unless you name an address                           |
 | `8788` | `nshtestherd`           | the coordinator of the load test                                                                    |
 | `8099` | `eas-mock-server`       | the stand-in ActiveSync server (plain HTTP, on loopback)                                            |
 

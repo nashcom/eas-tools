@@ -174,6 +174,9 @@ the token, and without `-docs` `/openapi.json` needs it too and `/docs` is not t
 - Changing the mailbox is off unless `-write` (or `"write": true` in the config) is given, and sending is off unless `-send`
   (`"send": true`) is given. A refused request is `403 write_disabled` or `403 send_disabled` and never reaches the server.
   `GET /accounts` shows both switches (`allow_write`, `allow_send`).
+- `-send-domains` (`"send_domains"` in the config) limits where mail may go: `example.com` is that domain, `*.example.com` every domain
+  below it; repeat it or separate the values by commas. It applies to send, reply and forward, in the command line and in the REST API
+  (`403 recipient_not_allowed`). Without it there is no limit. The same configuration is used by [eas-mcp](MCP.md).
 - Passwords are never part of an answer or of the log.
 
 ## Accounts and settings

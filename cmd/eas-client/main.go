@@ -2,9 +2,7 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,7 +13,6 @@ import (
 	"net/mail"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -23,10 +20,9 @@ import (
 
 	"github.com/nashcom/eas-tools/client"
 	"github.com/nashcom/eas-tools/internal/certreload"
+	"github.com/nashcom/eas-tools/internal/clientcfg"
 	"github.com/nashcom/eas-tools/internal/ipacl"
 	"github.com/nashcom/eas-tools/internal/listenaddr"
-	"github.com/nashcom/eas-tools/internal/logging"
-	"github.com/nashcom/eas-tools/internal/settings"
 	"github.com/nashcom/eas-tools/probe"
 )
 
@@ -82,41 +78,14 @@ Options:
 `
 
 // stringList is an option that may be given several times and holds comma separated values.
-type stringList []string
-
-func (l *stringList) String() string { return strings.Join(*l, ",") }
-func (l *stringList) Set(v string) error {
-	for _, p := range strings.Split(v, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			*l = append(*l, p)
-		}
-	}
-	return nil
-}
+type stringList = clientcfg.StringList
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer, environ func() []string) int {
 	fs := flag.NewFlagSet("eas-client", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	cf := clientcfg.Define(fs)
+	account, timeout, showVer := cf.Account, cf.Timeout, cf.ShowVersion
 	var (
-		_         = fs.String("config", "", "JSON config file: the options (keys are the option names, \"-\" written as \"_\") and \"accounts\", a list of accounts with a \"name\"")
-		account   = fs.String("account", "", "the account to use (default: the only one)")
-		server    = fs.String("server", "", "EAS endpoint (host or URL) of a single account given on the command line")
-		email     = fs.String("email", "", "e-mail address of that account")
-		user      = fs.String("user", "", "login name if different from -email")
-		pwEnv     = fs.String("password-env", "EASCLIENT_PASSWORD", "name of the environment variable holding the password")
-		pwFile    = fs.String("password-file", "", "read the password from the first line of this file")
-		pwStdin   = fs.Bool("password-stdin", false, "read the password from the first line of stdin")
-		deviceID  = fs.String("device-id", "", "device id (default: derived from user and server, for this tool alone)")
-		profile   = fs.String("profile", "", "how to present the device (see eas-probe -h)")
-		provision = fs.String("provision", "auto", "auto | always | never")
-		insecure  = fs.Bool("insecure", false, "do not verify the server TLS certificate")
-		caFile    = fs.String("ca-file", "", "PEM file with additional trusted CA certificates")
-		statePath = fs.String("state-file", "", "state file (default: client-state.json in the easprobe directory of the user config dir)")
-		noState   = fs.Bool("no-state", false, "keep no state on disk")
-		write     = fs.Bool("write", false, "allow read, unread, move and delete (reading is always allowed)")
-		send      = fs.Bool("send", false, "allow send: sending a mail is a switch of its own, -write does not include it")
-		timeout   = fs.Duration("timeout", time.Minute, "time limit of one command or one REST request")
-		timezone  = fs.String("timezone", "", "time zone of times without an offset and of new calendar entries, a name such as Europe/Berlin (default: the zone of the machine: TZ, /etc/localtime, Windows)")
 		listen    = fs.String("listen", "", "serve: address of the REST API. Default: :8443 (HTTPS: TLS is the default), and 127.0.0.1:8080 with -allow-http (unencrypted is loopback unless an address is named)")
 		tokenFile = fs.String("auth-token-file", "", "serve: file with the bearer token of the REST API (first line)")
 		tlsCert   = fs.String("tls-cert", "", "serve: certificate file; with -tls-key the API is served over HTTPS")
@@ -129,11 +98,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, environ func(
 		tlsEvery  = fs.Duration("tls-update-interval", certreload.DefaultUpdateEvery, "serve: how often the certificate host is asked for a renewed certificate (it is asked at the start as well)")
 		docs      = fs.Bool("docs", false, "serve: also the page /docs (Swagger UI) where the requests of the API can be tried, and /openapi.json is there always")
 		docsUI    = fs.String("docs-ui", "", "serve: where the browser loads Swagger UI from for /docs: the URL of a directory with swagger-ui.css and swagger-ui-bundle.js (default: the CDN jsDelivr, in the version pinned in the program, with integrity hashes)")
-		traceFile = fs.String("trace", "", "append every request and response, WBXML decoded, to this file (no password or cookies)")
-		verbose   = fs.Bool("verbose", false, "log at level debug")
-		debug     = fs.Bool("debug", false, "log at level trace: the details and the library output")
-		logFormat = fs.String("log-format", "", "format of the log (on stderr): text (the default) or json")
-		showVer   = fs.Bool("version", false, "print version and exit")
 	)
 	allowHTTP := fs.Bool("allow-http", false, "serve: serve everything over plain HTTP although there is no certificate: for a proxy that terminates TLS. Without -tls-cert and without this the start is refused unless -listen is a loopback address")
 	listenHealth := fs.String("listen-health", "", "serve: with -tls-cert a second listener, plain HTTP, with /health only (always on then), for the health check of a container; default: the loopback interface and the port after -listen. Another address needs -allow-from-health")
@@ -155,33 +119,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, environ func(
 		fmt.Fprintf(stderr, "eas-client: "+format+"\n", a...)
 		return 2
 	}
-
-	// The accounts are a list in the config file, which the option settings do not take: read them here and hand the rest
-	// of the file on.
-	var fileAccounts []client.Account
-	readFile := func(p string) ([]byte, error) {
-		raw, err := os.ReadFile(p)
-		if err != nil {
-			return nil, err
-		}
-		var doc map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &doc); err != nil {
-			return nil, err
-		}
-		if a, ok := doc["accounts"]; ok {
-			dec := json.NewDecoder(bytes.NewReader(a))
-			dec.DisallowUnknownFields()
-			if err := dec.Decode(&fileAccounts); err != nil {
-				return nil, fmt.Errorf("accounts: %w", err)
-			}
-			delete(doc, "accounts")
-		}
-		return json.Marshal(doc)
-	}
-	res, err := settings.Resolve(fs, settings.Options{
-		Prefix: "EASCLIENT_", ConfigFlag: "config", Skip: []string{"version", "password-stdin"},
-		Extra: []string{"password", "auth_token", "log_level"}, Environ: environ, ReadFile: readFile,
-	})
+	res, err := cf.Resolve(fs, environ, os.ReadFile, "auth_token")
 	if err != nil {
 		return fail("%v", err)
 	}
@@ -204,76 +142,21 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, environ func(
 	if cmd == "serve" {
 		def = slog.LevelInfo
 	}
-	level, err := logging.Pick(res.Values["log_level"], *verbose, *debug, def)
+	logger, err := cf.Logger(res, def, stderr, "eas-client", version)
 	if err != nil {
 		return fail("%v", err)
 	}
-	state := logging.NewState(level)
-	if err := state.SetFormat(*logFormat); err != nil {
-		return fail("%v", err)
-	}
-	logger := logging.New(stderr, state, "eas-client", version)
 
-	// the accounts
-	accounts := fileAccounts
-	single := *server != "" || *email != "" || *user != ""
-	switch {
-	case single && len(accounts) > 0:
-		return fail("accounts are given in the config file and as -server/-email/-user: use one of the two")
-	case single:
-		a := client.Account{Name: "default", Server: *server, Email: *email, User: *user, PasswordFile: *pwFile, PasswordEnv: *pwEnv,
-			Password: res.Values["password"], DeviceID: strings.ToUpper(*deviceID), Profile: *profile, Provision: *provision}
-		if *insecure {
-			a.Insecure = insecure
-		}
-		a.CAFile = *caFile
-		if *pwStdin {
-			line, err := bufioLine(stdin)
-			if err != nil || line == "" {
-				return fail("-password-stdin: no password on stdin")
-			}
-			a.Password, a.PasswordFile = line, ""
-		}
-		accounts = []client.Account{a}
-	case cmd == "accounts" || cmd == "serve" || len(accounts) > 0:
-	default:
-		return fail("no account: give -server and -email (or -user), or accounts in the config file (-config)")
-	}
-
-	// the state of the device
-	sp := *statePath
-	if sp == "" {
-		sp = filepath.Join(filepath.Dir(probe.DefaultStatePath()), "client-state.json")
-	}
-	if *noState {
-		sp = ""
-	}
-	store, err := probe.OpenStore(sp)
+	// the accounts and their state, shared with eas-mcp
+	accounts, err := cf.Accounts(res, stdin, cmd == "accounts" || cmd == "serve")
 	if err != nil {
 		return fail("%v", err)
 	}
-	if msg := store.Recovered(); msg != "" {
-		logger.Warn(msg)
-	}
-
-	var tracer *probe.Tracer
-	if *traceFile != "" {
-		if tracer, err = probe.OpenTracer(*traceFile); err != nil {
-			return fail("%v", err)
-		}
-		defer tracer.Close()
-	}
-
-	m, err := client.NewManager(accounts, client.Options{Trace: tracer, AllowWrite: *write, AllowSend: *send, Store: store, Logger: logger, Insecure: *insecure, CAFile: *caFile, TimeZone: *timezone})
+	m, store, closeAll, err := cf.Open(accounts, logger)
 	if err != nil {
 		return fail("%v", err)
 	}
-	defer m.Close()
-	defer func() {
-		if err := store.Flush(); err != nil {
-			logger.Warn("the state could not be saved", "error", err.Error())
-		}
-	}()
+	defer closeAll()
 
 	if cmd == "serve" {
 		token := res.Values["auth_token"]
