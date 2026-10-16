@@ -34,10 +34,9 @@ services:
       # the certificate, in the default place; the same volume as the exporter (docker-compose.yml), so that both use one CA and one certificate
       - eas-tls:/run/secrets/tls
     healthcheck:
-      # TLS is the default: 8443 speaks HTTPS only, and the health listener (/health only) runs on the loopback interface of the container, one port up
-      # (docs/TLS.md). With "allow_http": true in client.json the API is on 8080 (give "listen": ":8080" in a container) and the check is the one below.
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8444/health"]
-      # test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      # the client asks itself for /health, on the port that its options say (the health listener one port up with TLS, the main port with allow_http):
+      # it needs no wget, so it works in every image, the static one too
+      test: ["CMD", "/usr/local/bin/eas-client", "-config", "/etc/eas-tools/client.json", "-health-check"]
       interval: 30s
       timeout: 5s
       start_period: 5s

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -44,52 +43,52 @@ func defaultListen(given string, allowHTTP bool) string {
 // httpOptions are the settings of the transport "http". They mean what the settings of the same name of eas-client serve mean, see
 // docs/TLS.md: TLS is the default, plain HTTP is a choice, and the certificate is looked for in /run/secrets/tls.
 type httpOptions struct {
-	addr, token, cert, key string
-	allow                  *ipacl.List
-	allowHTTP              bool
-	send                   bool // sending is allowed: only for the warning
-	tlsGenerate            bool
-	tlsNames               []string
-	tlsCheck               time.Duration
-	tlsDays                int
-	tlsUpdateFrom          string
-	tlsUpdateName          string
-	tlsUpdateEvery         time.Duration
-	healthAddr             string // with TLS: the listener of /health next to HTTPS; default loopback, the next port
-	allowHealth            *ipacl.List
+	addr, cert, key string
+	authn           *authn
+	allow           *ipacl.List
+	allowHTTP       bool
+	send            bool // sending is allowed: only for the warning
+	stateless       bool // no session of the protocol: every request stands alone
+	tlsGenerate     bool
+	tlsNames        []string
+	tlsCheck        time.Duration
+	tlsDays         int
+	tlsUpdateFrom   string
+	tlsUpdateName   string
+	tlsUpdateEvery  time.Duration
+	healthAddr      string // with TLS: the listener of /health next to HTTPS; default loopback, the next port
+	allowHealth     *ipacl.List
 }
 
 // httpHandler is what a listener serves: /mcp (the MCP endpoint, with the token) and /health. The list of the peers is checked first, for
 // every request. A health listener (healthOnly) serves /health and nothing else.
-func httpHandler(srv *mcp.Server, token string, allow *ipacl.List, healthOnly bool, log *slog.Logger) http.Handler {
+func httpHandler(srv *mcp.Server, a *authn, allow *ipacl.List, healthOnly, stateless bool, log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "OK\n")
 	})
 	if !healthOnly {
-		mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, &mcp.StreamableHTTPOptions{Logger: log})
-		mux.Handle("/mcp", bearer(token, mcpHandler))
+		mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, &mcp.StreamableHTTPOptions{Logger: log, Stateless: stateless})
+		mux.Handle("/mcp", a.wrap(mcpHandler))
+		if a != nil && a.oidc != nil { // where a client finds the provider to log in with: no token is needed to read it
+			for _, p := range a.metaPaths {
+				mux.Handle(p, a.metadata())
+			}
+			if a.compat != "off" {
+				for _, p := range legacyPaths { // where a client that does not read the metadata looks for the login server
+					mux.Handle(p, a.authServerMetadata())
+				}
+			}
+		}
 	}
+	// everything that no pattern above takes: the log says which addresses the clients ask for and do not find (the query is not logged: it can hold secrets)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Info("a request for an address that does not exist", "method", r.Method, "path", r.URL.Path, "host", r.Host, "remote", r.RemoteAddr, "user_agent", r.UserAgent())
+		http.NotFound(w, r)
+	})
 	return allow.Wrap(mux, func(remote string, r *http.Request) {
 		log.Debug("request refused by allow-from", "remote", remote, "method", r.Method, "path", r.URL.Path)
-	})
-}
-
-// bearer lets a request pass that has "Authorization: Bearer <token>"; without a token set every request passes. The token is only taken from
-// the header, never from the URL, which ends up in logs.
-func bearer(token string, next http.Handler) http.Handler {
-	if token == "" {
-		return next
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if !ok || subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="eas-mcp"`)
-			http.Error(w, "a bearer token is required", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
 	})
 }
 
@@ -122,9 +121,9 @@ func serveHTTP(mcpSrv *mcp.Server, store *probe.Store, log *slog.Logger, o httpO
 			return fail(2, "-listen-health:", err)
 		}
 	}
-	if !listenaddr.Loopback(o.addr) && o.token == "" {
+	if !listenaddr.Loopback(o.addr) && !o.authn.enabled() {
 		// not an error: the network can protect the endpoint (a proxy, a firewall, the list of peers); the log says what the endpoint is
-		log.Warn("the MCP endpoint has no token and is not on loopback: every peer that can reach it may read the mailboxes (and send mail with -send); protect it on the network or with -allow-from, or set EASCLIENT_AUTH_TOKEN",
+		log.Warn("the MCP endpoint has no token and is not on loopback: every peer that can reach it may read the mailboxes (and send mail with -send); protect it on the network or with -allow-from, or set EASCLIENT_AUTH_TOKEN or use OIDC (-oidc-issuer)",
 			"listen", o.addr, "allow_from", o.allow.Entries(), "allow_send", o.send)
 	}
 	if err := listenaddr.NeedsHTTPSwitch(o.addr, o.cert != "", o.allowHTTP); err != nil {
@@ -152,7 +151,7 @@ func serveHTTP(mcpSrv *mcp.Server, store *probe.Store, log *slog.Logger, o httpO
 		}
 	}
 
-	srv := &http.Server{Addr: o.addr, Handler: httpHandler(mcpSrv, o.token, o.allow, false, log), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: o.addr, Handler: httpHandler(mcpSrv, o.authn, o.allow, false, o.stateless, log), ReadHeaderTimeout: 10 * time.Second, ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
 	var healthSrv *http.Server
 	var healthLn net.Listener
 	if healthAddr != "" {
@@ -161,7 +160,7 @@ func serveHTTP(mcpSrv *mcp.Server, store *probe.Store, log *slog.Logger, o httpO
 			return fail(1, err)
 		}
 		defer healthLn.Close()
-		healthSrv = &http.Server{Handler: httpHandler(mcpSrv, "", o.allowHealth, true, log), ReadHeaderTimeout: 10 * time.Second}
+		healthSrv = &http.Server{Handler: httpHandler(mcpSrv, nil, o.allowHealth, true, o.stateless, log), ReadHeaderTimeout: 10 * time.Second, ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
 		if !listenaddr.Loopback(healthAddr) {
 			log.Warn("the health listener is not on loopback: only -allow-from-health protects it, and the traffic is not encrypted",
 				"listen_health", healthAddr, "allow_from_health", o.allowHealth.Entries())
@@ -205,10 +204,7 @@ func serveHTTP(mcpSrv *mcp.Server, store *probe.Store, log *slog.Logger, o httpO
 	}
 	defer mainLn.Close()
 
-	auth, authDetail := "none", "no token is set: every peer that -allow-from lets in may use it"
-	if o.token != "" {
-		auth, authDetail = "token", "header Authorization: Bearer <token>"
-	}
+	auth, authDetail := o.authn.describe()
 	note := "plain HTTP because the address is loopback: it never leaves the machine"
 	switch {
 	case o.cert != "":
@@ -238,7 +234,7 @@ func serveHTTP(mcpSrv *mcp.Server, store *probe.Store, log *slog.Logger, o httpO
 			errc <- srv.Serve(mainLn)
 		}
 	}()
-	log.Info("MCP endpoint started")
+	log.Info("MCP endpoint started", "stateless", o.stateless, "protocol_versions", strings.Join(mcp.SupportedProtocolVersions(), ","))
 
 	select {
 	case err := <-errc:

@@ -169,12 +169,15 @@ func schemaOf(t reflect.Type, defs map[string]any) map[string]any {
 				if jsonName == "" {
 					jsonName = f.Name
 				}
-				props[jsonName] = schemaOf(f.Type, defs)
+				props[jsonName] = withDescription(schemaOf(f.Type, defs), fieldDocs[name+"."+jsonName])
 				if f.Type.Kind() != reflect.Ptr && !strings.Contains(opts, "omitempty") {
 					required = append(required, jsonName)
 				}
 			}
 			schema := map[string]any{"type": "object", "properties": props}
+			if d := typeDocs[name]; d != "" {
+				schema["description"] = d
+			}
 			if len(required) > 0 {
 				sort.Strings(required)
 				schema["required"] = required
@@ -184,4 +187,16 @@ func schemaOf(t reflect.Type, defs map[string]any) map[string]any {
 		return map[string]any{"$ref": "#/components/schemas/" + name}
 	}
 	return map[string]any{} // any value
+}
+
+// withDescription puts a text on a schema. A reference to another schema cannot have siblings in OpenAPI 3.0, so it goes into allOf.
+func withDescription(schema map[string]any, text string) map[string]any {
+	if text == "" {
+		return schema
+	}
+	if _, isRef := schema["$ref"]; isRef {
+		return map[string]any{"allOf": []any{schema}, "description": text}
+	}
+	schema["description"] = text
+	return schema
 }

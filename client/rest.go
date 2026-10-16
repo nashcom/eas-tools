@@ -79,7 +79,7 @@ func (h *restHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// token when it opens a page, so with the page switched on the page, its files and the description need no token: they say what the
 	// API is and hold no data. Every request of the API itself still needs the token (the Authorize button of the page takes it).
 	isDocs := h.docs != nil && len(parts) > 0 && parts[0] == "docs"
-	public := (rt != nil && rt.Public) || isDocs || (h.docs != nil && rt != nil && rt.ID == "openapi")
+	public := (rt != nil && rt.Public) || isDocs || (h.docs != nil && rt != nil && rt.ID == "getOpenAPI")
 	if !public && !h.authorized(r) {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="eas-client"`)
 		writeError(w, newError(http.StatusUnauthorized, "unauthorized", "a valid bearer token is required"))

@@ -149,6 +149,15 @@ func (m *Manager) CreateEvent(ctx context.Context, account, folder string, r Eve
 	if len(r.Attendees) > 0 && !m.opts.AllowSend {
 		return nil, newError(http.StatusForbidden, "send_disabled", "an event with attendees invites them and sends mail, and sending is not allowed: start with -send (send in the config)")
 	}
+	if len(r.Attendees) > 0 {
+		emails := make([]string, 0, len(r.Attendees))
+		for _, at := range r.Attendees {
+			emails = append(emails, at.Email)
+		}
+		if err := m.checkRecipients(emails); err != nil { // the invitation is mail to them, from the client or from the server
+			return nil, err
+		}
+	}
 	ent, err := m.resolve(account)
 	if err != nil {
 		return nil, err
@@ -212,6 +221,15 @@ func (m *Manager) DeleteEventWith(ctx context.Context, account, folder, id strin
 		}
 		if len(e.Attendees) > 0 && !m.opts.AllowSend {
 			return newError(http.StatusForbidden, "send_disabled", "the event has attendees, and deleting it may send them a cancellation, and sending is not allowed: start with -send (send in the config)")
+		}
+		if len(e.Attendees) > 0 { // the cancellation is mail to them, and nothing is deleted when it may not go
+			emails := make([]string, 0, len(e.Attendees))
+			for _, at := range e.Attendees {
+				emails = append(emails, at.Email)
+			}
+			if err := m.checkRecipients(emails); err != nil {
+				return err
+			}
 		}
 		if err := s.DeleteEvent(ctx, f.ID, id); err != nil {
 			return err

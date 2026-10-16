@@ -5,6 +5,8 @@ This file is made by `scripts/licenses.sh`: run it again when `go.mod` changes.
 
 | Package                                          | License      | License text                                                               |
 | ------------------------------------------------ | ------------ | -------------------------------------------------------------------------- |
+| `github.com/go-jose/go-jose/v4`                  | Apache-2.0   | https://github.com/go-jose/go-jose/blob/v4.1.5/LICENSE                     |
+| `github.com/go-jose/go-jose/v4/json`             | BSD-3-Clause | https://github.com/go-jose/go-jose/blob/v4.1.5/json/LICENSE                |
 | `github.com/google/jsonschema-go/jsonschema`     | MIT          | https://github.com/google/jsonschema-go/blob/v0.4.3/LICENSE                |
 | `github.com/hstern/go-activesync`                | MIT          | https://github.com/hstern/go-activesync/blob/v1.1.0/LICENSE                |
 | `github.com/modelcontextprotocol/go-sdk`         | Apache-2.0   | https://github.com/modelcontextprotocol/go-sdk/blob/v1.8.0/LICENSE         |

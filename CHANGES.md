@@ -4,6 +4,29 @@ Newest version first. Every change is noted here with the change itself. All the
 `Version` in `probe/profile.go`). `push-release.sh` refuses to tag a version that has no section here, and the release workflow makes the text of
 the GitHub release from it.
 
+## 0.9.3
+
+**eas-mcp grows up, and is still experimental.** It now has everything that `eas-client` has, a login with OpenID Connect, and an audit log.
+
+- **Calendar and contacts:** `list_events`, `get_event`, `get_event_ics`, `list_contacts`, `get_contact`, `get_contact_vcard`, `export_contacts`
+  (read only), and `create_event` and `delete_event` (`-write`; a meeting with attendees needs `-send` too). Every command of `eas-client` has a
+  tool now ([docs/MCP.md](docs/MCP.md) maps them); `no_sent_copy` is there for send, reply and forward.
+- **Login with OpenID Connect:** the endpoint checks the JWT access tokens of your provider (signature, issuer, audience, expiry), and the user
+  against `oidc_users` (`alice@example.com`, `*@example.com`, `*`). The signing keys are saved, so that it goes on when the provider is not
+  reachable. The local token stays as the fallback. No client registration on this side. See [docs/AUTH.md](docs/AUTH.md), a new page about the
+  authentication of all the programs.
+- **The protocol 2026-07-28:** the transport http is stateless by default (`-stateless`); older clients work as before.
+- **More in the log:** a tool that fails and a request that is refused say why, at the normal level; so does a request for an address that does not
+  exist. **`-audit-log`** writes an optional audit trail, one JSON object per line in the OpenTelemetry log data model: who called which tool, on which
+  item, to which recipients, and the result, never the text. See [docs/LOGGING.md](docs/LOGGING.md), a new page about logging.
+- **`-health-check`** for `eas-client` and `eas-mcp`: a health check of a container that needs no shell, in all the images.
+- **`-send-domains` now covers meetings:** the invitation and the cancellation of a meeting are mail to the attendees, and follow the list of domains
+  in `eas-mcp`, `eas-client` and its REST API.
+- **Every option of eas-mcp** can be given on the command line, as an `EASCLIENT_` variable and in the JSON file; a test checks that. An account of the
+  file without a password uses `EASCLIENT_PASSWORD`.
+- **The OpenAPI description of the REST API is complete:** every operation and every field has a text, and the operation ids are verbs (`listAccounts`, `getAccountInfo`, `listFolders`, `getMessageEml`, ...; they were `accounts`, `info`, `folders`, `emlMessage`). A test keeps it so.
+- A new library, `go-jose` (the check of the signatures); the licenses are in `THIRD_PARTY.md`.
+
 ## 0.9.2
 
 **eas-mcp, a first experimental addition: the mailboxes for AI clients.** `eas-mcp` is an [MCP](https://modelcontextprotocol.io) server on

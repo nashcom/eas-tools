@@ -74,25 +74,25 @@ var (
 func routeTable() []route {
 	var rs []route
 	add := func(r route) { rs = append(rs, r) }
-	add(route{ID: "health", Method: "GET", Path: "/health", Tag: "service", Summary: "Liveness check", Result: &HealthResult{}, Public: true,
+	add(route{ID: "getHealth", Method: "GET", Path: "/health", Tag: "service", Summary: "Liveness check", Desc: "Answers ok while the process runs. It needs no token, and it does not connect to the server of the account.", Result: &HealthResult{}, Public: true,
 		Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 			writeJSON(w, http.StatusOK, HealthResult{Status: "ok"})
 		}})
-	add(route{ID: "openapi", Method: "GET", Path: "/openapi.json", Tag: "service", Summary: "This description of the API", Raw: "application/json",
+	add(route{ID: "getOpenAPI", Method: "GET", Path: "/openapi.json", Tag: "service", Summary: "This description of the API", Desc: "This OpenAPI 3 document: every request with its parameters, the JSON of the requests and of the answers, and the errors. It needs the token, unless the page /docs is switched on (-docs), which makes it open.", Raw: "application/json",
 		Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 			writeJSON(w, http.StatusOK, OpenAPI())
 		}})
 
-	add(route{ID: "accounts", Method: "GET", Path: "/accounts", Tag: "account", Summary: "The accounts", Desc: "The accounts of the configuration, never their passwords, and whether writing and sending are allowed.",
+	add(route{ID: "listAccounts", Method: "GET", Path: "/accounts", Tag: "account", Summary: "The accounts", Desc: "The accounts of the configuration, never their passwords, and whether writing and sending are allowed.",
 		Result: &AccountsResult{}, Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 			reply(w, http.StatusOK, h.m.Accounts(), nil)
 		}})
-	add(route{ID: "info", Method: "GET", Path: "/accounts/{account}", Tag: "account", Summary: "Server and device", Desc: "The server product, the protocol version, the commands it offers, the device and the time zone.",
+	add(route{ID: "getAccountInfo", Method: "GET", Path: "/accounts/{account}", Tag: "account", Summary: "Server and device", Desc: "The server product, the protocol version, the commands it offers, the device and the time zone.",
 		Result: &Info{}, Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 			res, err := h.m.Info(r.Context(), v["account"])
 			reply(w, http.StatusOK, res, err)
 		}})
-	add(route{ID: "folders", Method: "GET", Path: "/accounts/{account}/folders", Tag: "mail", Summary: "The folders", Result: &FoldersResult{},
+	add(route{ID: "listFolders", Method: "GET", Path: "/accounts/{account}/folders", Tag: "mail", Summary: "The folders", Desc: "Every folder of the mailbox (mail, calendar, contacts and others) with its id, name, parent and type. The ids are what the other requests take as folder.", Result: &FoldersResult{},
 		Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 			res, err := h.m.Folders(r.Context(), v["account"])
 			reply(w, http.StatusOK, res, err)
@@ -131,7 +131,7 @@ func routeTable() []route {
 		if !withFolder {
 			suffix = ""
 		}
-		add(route{ID: "getMessage" + suffix, Method: "GET", Path: base, Tag: "mail", Summary: "One mail with its whole body", Desc: "Plain text body." + note, Result: &GetResult{},
+		add(route{ID: "getMessage" + suffix, Method: "GET", Path: base, Tag: "mail", Summary: "One mail with its whole body", Desc: "The whole mail: sender, recipients, subject, date, flags and the full text of the body, as plain text. Attachments are not in the JSON; the .eml request returns the whole message with them. The id is the one that the list shows." + note, Result: &GetResult{},
 			Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 				res, err := h.m.Get(r.Context(), v["account"], v["folder"], v["id"])
 				reply(w, http.StatusOK, res, err)
@@ -161,7 +161,7 @@ func routeTable() []route {
 				res, err := h.m.Delete(r.Context(), v["account"], v["folder"], v["id"])
 				reply(w, http.StatusOK, res, err)
 			}})
-		add(route{ID: "emlMessage" + suffix, Method: "GET", Path: base + "/eml", Tag: "mail", Summary: "The whole message as a mail file (.eml)",
+		add(route{ID: "getMessageEml" + suffix, Method: "GET", Path: base + "/eml", Tag: "mail", Summary: "The whole message as a mail file (.eml)",
 			Desc: "The message as the server builds it (MIME): all headers, the text and the parts. Not JSON." + note, Raw: "message/rfc822",
 			Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 				raw, err := h.m.EML(r.Context(), v["account"], v["folder"], v["id"])
@@ -225,7 +225,7 @@ func routeTable() []route {
 				res, err := h.m.CreateEvent(r.Context(), v["account"], v["folder"], req)
 				reply(w, http.StatusOK, res, err)
 			}})
-		add(route{ID: "getEvent" + suffix, Method: "GET", Path: base + "/{id}", Tag: "calendar", Summary: "One event with all details", Result: &EventResult{},
+		add(route{ID: "getEvent" + suffix, Method: "GET", Path: base + "/{id}", Tag: "calendar", Summary: "One event with all details", Desc: "The subject, place, start and end, the busy state and sensitivity, the reminder, the attendees and their answers, the repeat rule and its exceptions, and the description. The id is the one that the list shows.", Result: &EventResult{},
 			Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 				res, err := h.m.Event(r.Context(), v["account"], v["folder"], v["id"])
 				reply(w, http.StatusOK, res, err)
@@ -237,7 +237,7 @@ func routeTable() []route {
 				res, err := h.m.DeleteEventWith(r.Context(), v["account"], v["folder"], v["id"], r.URL.Query().Get("cancel_mail") != "false")
 				reply(w, http.StatusOK, res, err)
 			}})
-		add(route{ID: "icsEvent" + suffix, Method: "GET", Path: base + "/{id}/ics", Tag: "calendar", Summary: "One event as an iCalendar file (.ics)",
+		add(route{ID: "getEventIcs" + suffix, Method: "GET", Path: base + "/{id}/ics", Tag: "calendar", Summary: "One event as an iCalendar file (.ics)",
 			Desc: "Built from the fields of the event, in the time zone of the account. Not JSON.", Raw: "text/calendar",
 			Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 				raw, err := h.m.ICS(r.Context(), v["account"], v["folder"], v["id"])
@@ -266,12 +266,12 @@ func routeTable() []route {
 				res, err := h.m.Contacts(r.Context(), v["account"], v["folder"], ContactParams{Search: q.Get("search"), Limit: lim})
 				reply(w, http.StatusOK, res, err)
 			}})
-		add(route{ID: "getContact" + suffix, Method: "GET", Path: base + "/{id}", Tag: "contacts", Summary: "One contact with all details", Result: &ContactResult{},
+		add(route{ID: "getContact" + suffix, Method: "GET", Path: base + "/{id}", Tag: "contacts", Summary: "One contact with all details", Desc: "The names, e-mail addresses, phone numbers, postal addresses, company data and categories. The photo is not in the JSON (has_photo and photo_bytes say that there is one); the vCard request returns it. The id is the one that the list shows.", Result: &ContactResult{},
 			Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 				res, err := h.m.Contact(r.Context(), v["account"], v["folder"], v["id"])
 				reply(w, http.StatusOK, res, err)
 			}})
-		add(route{ID: "vcfContact" + suffix, Method: "GET", Path: base + "/{id}/vcf", Tag: "contacts", Summary: "One contact as a vCard file (.vcf)", Desc: "vCard 3.0, with the photo. Not JSON.", Raw: "text/vcard",
+		add(route{ID: "getContactVcard" + suffix, Method: "GET", Path: base + "/{id}/vcf", Tag: "contacts", Summary: "One contact as a vCard file (.vcf)", Desc: "vCard 3.0, with the photo. Not JSON.", Raw: "text/vcard",
 			Handle: func(h *restHandler, w http.ResponseWriter, r *http.Request, v vars) {
 				raw, err := h.m.VCard(r.Context(), v["account"], v["folder"], v["id"])
 				writeRaw(w, raw, err)

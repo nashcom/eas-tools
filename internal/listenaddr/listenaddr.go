@@ -9,8 +9,11 @@ package listenaddr
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"strconv"
+	"time"
 )
 
 // Loopback reports whether the address listens on the loopback interface only.
@@ -89,4 +92,42 @@ func PlainWhy(listen string, allowHTTP bool) string {
 		return "listen is loopback"
 	}
 	return ""
+}
+
+// HealthPort is the port where the running program answers /health in plain HTTP on the loopback interface, for the health check of a
+// container (the option -health-check of the client and of eas-mcp): with TLS it is the port of the health listener (healthAddr, or the
+// port after the main one), without TLS it is the main port, which is plain HTTP. TLS is there when there is a certificate, or when the
+// address is not loopback and plain HTTP was not chosen (the certificate of /run/secrets/tls is used then).
+func HealthPort(listen, healthAddr string, haveCert, allowHTTP bool) (string, error) {
+	addr := listen
+	if haveCert || (!allowHTTP && !Loopback(listen)) {
+		addr = healthAddr
+		if addr == "" {
+			var err error
+			if addr, err = DefaultNext(listen, false); err != nil {
+				return "", err
+			}
+		}
+	}
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", fmt.Errorf("address %q: %w", addr, err)
+	}
+	return port, nil
+}
+
+// CheckHealth asks http://127.0.0.1:PORT/health and returns the exit code of a health check: 0 for 200, and 1 otherwise, with the reason on w.
+func CheckHealth(port string, w io.Writer) int {
+	c := http.Client{Timeout: 3 * time.Second}
+	resp, err := c.Get("http://127.0.0.1:" + port + "/health")
+	if err != nil {
+		fmt.Fprintln(w, "health-check:", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(w, "health-check: HTTP", resp.Status)
+		return 1
+	}
+	return 0
 }

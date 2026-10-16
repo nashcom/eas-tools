@@ -131,6 +131,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, environ func(
 		return 0
 	}
 
+	if *cf.HealthCheck { // before the accounts: the check needs the address only
+		port, err := listenaddr.HealthPort(defaultListen(*listen, *allowHTTP), *listenHealth, *tlsCert != "", *allowHTTP)
+		if err != nil {
+			return fail("health-check: %v", err)
+		}
+		return listenaddr.CheckHealth(port, stderr)
+	}
+
 	rest := fs.Args()
 	if len(rest) == 0 {
 		fs.Usage()

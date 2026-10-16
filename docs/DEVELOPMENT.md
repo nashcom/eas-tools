@@ -103,6 +103,10 @@ cmd/eas-load/                 nshtestherd worker generating ActiveSync load
 cmd/eas-mock-server/         mock ActiveSync server for demos and tests
 cmd/eas-client/              mail, calendar and contact client: command line and REST API (serve)
 cmd/eas-mcp/                 MCP server of the mailboxes for AI clients (stdio), see docs/MCP.md
+                             (main.go options and start, serve.go the HTTP listener, authn.go the login, audit.go the audit log,
+                              tools.go and tools_calendar.go the tools)
+docs/AUTH.md                authentication and access control: tokens, OIDC
+docs/LOGGING.md             logging and auditing: the log, the trace, the audit log
 client/                     the operations of the client and the REST API (route table, OpenAPI document, Swagger UI page)
 herd/                        client for the nshtestherd coordinator protocol
 load/                        worker: client state machine, jobs, statistics
@@ -110,6 +114,7 @@ exporter/                    config file, /probe, /metrics, /health, result cach
 mailmonitor/                  mail monitor: mail to an address outside, round-trip time, one thread for all targets
 internal/easmockserver/      the mock ActiveSync server as a package (tests and cmd/eas-mock-server)
 internal/clientcfg/          the options and the accounts that eas-client and eas-mcp have in common
+internal/oidcauth/           the check of the JWT access tokens of an OIDC provider (eas-mcp)
 internal/testherd/           a tiny in-process coordinator for the Go unit tests
 internal/certreload/        the certificate of a listener: reload while running, the micro CA, the log of the start
 internal/ipacl/             allow lists of addresses, networks and ranges (allow_from)

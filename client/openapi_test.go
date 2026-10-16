@@ -142,7 +142,7 @@ func TestOpenAPIReferencesResolveAndTypesAreThere(t *testing.T) {
 			t.Errorf("Message has no property %q", f)
 		}
 	}
-	if props["read"].(map[string]any)["type"] != "boolean" || props["date"].(map[string]any)["$ref"] != "#/components/schemas/Time" {
+	if props["read"].(map[string]any)["type"] != "boolean" || refOf(props["date"]) != "#/components/schemas/Time" {
 		t.Errorf("Message.read = %v, Message.date = %v", props["read"], props["date"])
 	}
 	required, _ := msg["required"].([]any)
@@ -227,6 +227,78 @@ func TestEveryRouteIsServed(t *testing.T) {
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusMethodNotAllowed || (e.Error != nil && e.Error.Code == "not_found") {
 			t.Errorf("%s %s is in the table but the handler does not serve it: %d %+v", r.Method, r.Path, resp.StatusCode, e.Error)
+		}
+	}
+}
+
+// refOf is the schema that a property refers to: directly, or inside allOf when the property has a description of its own (OpenAPI 3.0 allows no
+// siblings next to a reference).
+func refOf(v any) string {
+	m, _ := v.(map[string]any)
+	if r, ok := m["$ref"].(string); ok {
+		return r
+	}
+	if all, ok := m["allOf"].([]any); ok && len(all) == 1 {
+		return refOf(all[0])
+	}
+	return ""
+}
+
+// The description of the API is what a person, Swagger UI, a generator of clients and an AI read: every operation says what it does, every parameter and
+// every field says what it is, and the name of an operation is a verb and an object, since a generator makes the name of a tool of it.
+func TestEveryOperationParameterAndFieldIsDescribed(t *testing.T) {
+	spec := specOf(t)
+	verbs := []string{"get", "list", "create", "delete", "send", "reply", "forward", "patch", "export"}
+	for p, item := range obj(t, spec["paths"], "paths") {
+		for method, op := range obj(t, item, p) {
+			o := obj(t, op, p+" "+method)
+			where := method + " " + p
+			id, _ := o["operationId"].(string)
+			okVerb := false
+			for _, v := range verbs {
+				if strings.HasPrefix(id, v) && len(id) > len(v) && id[len(v)] >= 'A' && id[len(v)] <= 'Z' {
+					okVerb = true
+				}
+			}
+			if !okVerb {
+				t.Errorf("%s: the operationId %q is not a verb and an object (get, list, create, ...): a generator makes the name of a tool of it", where, id)
+			}
+			if s, _ := o["summary"].(string); s == "" {
+				t.Errorf("%s has no summary", where)
+			}
+			if d, _ := o["description"].(string); len(d) < 20 {
+				t.Errorf("%s has no description (%q)", where, d)
+			}
+			if o["tags"] == nil {
+				t.Errorf("%s has no tag", where)
+			}
+			params, _ := o["parameters"].([]any)
+			for _, pr := range params {
+				pm := obj(t, pr, where+" parameter")
+				if d, _ := pm["description"].(string); d == "" {
+					t.Errorf("%s: the parameter %v has no description", where, pm["name"])
+				}
+			}
+			if responses, ok := o["responses"].(map[string]any); ok {
+				for code, r := range responses {
+					if d, _ := r.(map[string]any)["description"].(string); d == "" {
+						t.Errorf("%s: the response %s has no description", where, code)
+					}
+				}
+			}
+		}
+	}
+	schemas := obj(t, obj(t, spec["components"], "components")["schemas"], "schemas")
+	for name, sc := range schemas {
+		sm := obj(t, sc, name)
+		if d, _ := sm["description"].(string); d == "" {
+			t.Errorf("the schema %s has no description", name)
+		}
+		props, _ := sm["properties"].(map[string]any)
+		for field, pv := range props {
+			if d, _ := pv.(map[string]any)["description"].(string); d == "" {
+				t.Errorf("%s.%s has no description", name, field)
+			}
 		}
 	}
 }

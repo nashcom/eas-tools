@@ -17,8 +17,11 @@ Supporting tools, and the rest of the documentation:
 | ------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------ |
 | One probe on the command line (the engine of the exporter)                                  | `eas-probe`       | [docs/PROBE.md](docs/PROBE.md)             |
 | A stand-in ActiveSync server: try everything without Traveler                               | `eas-mock-server` | [docs/MOCKSERVER.md](docs/MOCKSERVER.md)   |
+| The mailboxes for AI clients such as Claude Code, over MCP (experimental)                   | `eas-mcp`         | [docs/MCP.md](docs/MCP.md)                 |
 | How the tools work together, two walk-throughs (without and with Traveler), troubleshooting |                   | [docs/GUIDE.md](docs/GUIDE.md)             |
 | HTTPS of the exporter and the client: certificates, the micro CA, ports                     |                   | [docs/TLS.md](docs/TLS.md)                 |
+| Who may call the programs: tokens, OIDC login for eas-mcp, users, networks, troubleshooting |                   | [docs/AUTH.md](docs/AUTH.md)               |
+| What the programs log, the trace and the audit log of eas-mcp, in OpenTelemetry form        |                   | [docs/LOGGING.md](docs/LOGGING.md)         |
 | Build, test, source layout, validation status, known limits                                 |                   | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 
 ## Before you start

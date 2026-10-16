@@ -40,7 +40,7 @@ func (l *StringList) Set(v string) error {
 // Flags are the options in common. The pointers are filled when the flag set is parsed.
 type Flags struct {
 	Account, Server, Email, User, PwEnv, PwFile, DeviceID, Profile, Provision, CAFile, StatePath, Timezone, TraceFile, LogFormat *string
-	PwStdin, Insecure, NoState, Write, Send, Verbose, Debug, ShowVersion                                                         *bool
+	PwStdin, Insecure, NoState, Write, Send, Verbose, Debug, ShowVersion, HealthCheck                                            *bool
 	Timeout                                                                                                                      *time.Duration
 	// SendDomains limits the domains that mail is sent to (-send-domains, send_domains in the file).
 	SendDomains StringList
@@ -76,6 +76,7 @@ func Define(fs *flag.FlagSet) *Flags {
 	f.Debug = fs.Bool("debug", false, "log at level trace: the details and the library output")
 	f.LogFormat = fs.String("log-format", "", "format of the log (on stderr): text (the default) or json")
 	f.ShowVersion = fs.Bool("version", false, "print version and exit")
+	f.HealthCheck = fs.Bool("health-check", false, "ask the running program on this machine for /health and exit with 0 (healthy) or 1: for the health check of a container, with the same options as the program that runs (-listen, -allow-http, -tls-cert, -listen-health)")
 	return f
 }
 
@@ -84,7 +85,7 @@ func Define(fs *flag.FlagSet) *Flags {
 // known to the file lists them in extra.
 func (f *Flags) Resolve(fs *flag.FlagSet, environ func() []string, readFile func(string) ([]byte, error), extra ...string) (settings.Result, error) {
 	return settings.Resolve(fs, settings.Options{
-		Prefix: Prefix, ConfigFlag: "config", Skip: []string{"version", "password-stdin"},
+		Prefix: Prefix, ConfigFlag: "config", Skip: []string{"version", "password-stdin", "health-check"},
 		Extra: append([]string{"password", "log_level"}, extra...), Environ: environ, ReadFile: f.accountsReader(readFile),
 	})
 }
@@ -177,13 +178,7 @@ func FirstLine(r io.Reader) (string, error) {
 // Open opens the state of the device and the trace, and makes the manager of the accounts. The function that it returns saves the state and
 // closes everything; it is called once, when the program ends.
 func (f *Flags) Open(accounts []client.Account, logger *slog.Logger) (m *client.Manager, store *probe.Store, closeAll func(), err error) {
-	sp := *f.StatePath
-	if sp == "" {
-		sp = filepath.Join(filepath.Dir(probe.DefaultStatePath()), "client-state.json")
-	}
-	if *f.NoState {
-		sp = ""
-	}
+	sp := f.StateFilePath()
 	store, err = probe.OpenStore(sp)
 	if err != nil {
 		return nil, nil, nil, err
@@ -215,4 +210,16 @@ func (f *Flags) Open(accounts []client.Account, logger *slog.Logger) (m *client.
 		}
 	}
 	return m, store, closeAll, nil
+}
+
+// StateFilePath is the file of the device state: -state-file, or client-state.json in the easprobe folder of the user config folder; empty with
+// -no-state.
+func (f *Flags) StateFilePath() string {
+	if *f.NoState {
+		return ""
+	}
+	if *f.StatePath != "" {
+		return *f.StatePath
+	}
+	return filepath.Join(filepath.Dir(probe.DefaultStatePath()), "client-state.json")
 }

@@ -129,7 +129,7 @@ the API does not pick "the only account" for you.
 
 **Description of the API.** `GET /openapi.json` is an OpenAPI 3 description of every request: the paths and their parameters,
 the JSON types of the requests and answers, the raw files, the error body, and which switch a request needs. It is made from the
-table of the routes and from the Go types, so it follows the code, and a test checks that every route is described and served. With
+table of the routes and from the Go types, so it follows the code, and a test checks that every route is described and served. Every operation has a summary and a description, every parameter and every field of every type has a text, and the operation ids are a verb and an object (`listAccounts`, `getMessage`, `getEventIcs`, `createEvent`): a test fails for anything without a text, because a generator of clients, an MCP generator or an AI reads exactly these texts and makes the names of its functions from the ids. With
 `-docs` (config `docs`) `GET /docs` is a page (Swagger UI) where the requests can be tried: the Authorize button takes the token.
 **Swagger UI is not part of the program or of its source.** The page makes the *browser* load it from an external location: by
 default the CDN jsDelivr, from the stream of version 5 (`swagger-ui-dist@5`: the newest 5.x.y, so fixes arrive by themselves and a new
@@ -203,6 +203,59 @@ list; each entry has a `name` and the keys of a target of the exporter:
 The order of precedence is the one of the other tools: command line, then environment (`EASCLIENT_<OPTION>`), then the file,
 then the default. With one account `-account` is not needed, with several it names the account. Accounts on the command line
 and `accounts` in the file together are an error.
+
+### All the options
+
+These options are common to `eas-client` and `eas-mcp`. Each one can be given on the command line, as an environment variable (`EASCLIENT_` and the
+name in upper case, `_` for `-`) and as a key of the JSON file (the name with `_` for `-`).
+
+| Command line      | Environment               | JSON file         | What it says                                                                                                                                               |
+| ----------------- | ------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-config`         | `EASCLIENT_CONFIG`        | not a key         | the JSON config file                                                                                                                                       |
+| `-account`        | `EASCLIENT_ACCOUNT`       | `"account"`       | the account to use; not needed when there is only one                                                                                                      |
+| `-server`         | `EASCLIENT_SERVER`        | `"server"`        | the ActiveSync endpoint (host or URL) of the single account of the command line                                                                            |
+| `-email`          | `EASCLIENT_EMAIL`         | `"email"`         | the e-mail address of that account                                                                                                                         |
+| `-user`           | `EASCLIENT_USER`          | `"user"`          | the login name, if it is not the e-mail address                                                                                                            |
+| `-password-env`   | `EASCLIENT_PASSWORD_ENV`  | `"password_env"`  | the name of the variable that holds the password; default `EASCLIENT_PASSWORD`, also for the accounts of the file that name no password                    |
+| `-password-file`  | `EASCLIENT_PASSWORD_FILE` | `"password_file"` | a file with the password (first line), for example a Docker secret                                                                                         |
+| `-password-stdin` | not a setting             | not a key         | read the password from stdin (not with `eas-mcp -transport stdio`)                                                                                         |
+| `-device-id`      | `EASCLIENT_DEVICE_ID`     | `"device_id"`     | the device id; default: derived from the user and the server, for this program alone                                                                       |
+| `-profile`        | `EASCLIENT_PROFILE`       | `"profile"`       | how the device presents itself (`iphone`, `ipad`, ...; see [PROBE.md](PROBE.md))                                                                           |
+| `-provision`      | `EASCLIENT_PROVISION`     | `"provision"`     | `auto` (default), `always` or `never`: whether the device provisions itself                                                                                |
+| `-insecure`       | `EASCLIENT_INSECURE`      | `"insecure"`      | do not verify the TLS certificate of Traveler (a test only)                                                                                                |
+| `-ca-file`        | `EASCLIENT_CA_FILE`       | `"ca_file"`       | a PEM file with CA certificates that are trusted in addition (for Traveler, and for the OIDC provider of `eas-mcp`)                                        |
+| `-state-file`     | `EASCLIENT_STATE_FILE`    | `"state_file"`    | the file of the device state (policy key, sync keys); default `client-state.json` in the user config folder                                                |
+| `-no-state`       | `EASCLIENT_NO_STATE`      | `"no_state"`      | keep no state on disk                                                                                                                                      |
+| `-write`          | `EASCLIENT_WRITE`         | `"write"`         | allow changing a mailbox and a calendar (read, unread, move, delete, create and delete events)                                                             |
+| `-send`           | `EASCLIENT_SEND`          | `"send"`          | allow sending mail, and mailing the invitations and cancellations of meetings; a switch of its own                                                         |
+| `-send-domains`   | `EASCLIENT_SEND_DOMAINS`  | `"send_domains"`  | send only to these domains (`example.com`, `*.example.com`); default: no limit                                                                             |
+| `-timeout`        | `EASCLIENT_TIMEOUT`       | `"timeout"`       | the time limit of one command, one request or one tool call; default `1m`                                                                                  |
+| `-timezone`       | `EASCLIENT_TIMEZONE`      | `"timezone"`      | the zone of times without an offset and of new events, such as `Europe/Berlin`; default: the zone of the machine                                           |
+| `-trace`          | `EASCLIENT_TRACE`         | `"trace"`         | append every request and response, WBXML decoded, to this file (no passwords or cookies)                                                                   |
+| `-verbose`        | `EASCLIENT_VERBOSE`       | `"verbose"`       | log at the debug level                                                                                                                                     |
+| `-debug`          | `EASCLIENT_DEBUG`         | `"debug"`         | log at the trace level                                                                                                                                     |
+| `-log-format`     | `EASCLIENT_LOG_FORMAT`    | `"log_format"`    | `text` (default) or `json` (the log data model of OpenTelemetry)                                                                                           |
+| `-health-check`   | not a setting             | not a key         | ask the running program on this machine for `/health` and exit with 0 or 1: for the health check of a container, with the options of the program that runs |
+| `-version`        | not a setting             | not a key         | print the version                                                                                                                                          |
+
+A password and a token are not options (the command line is visible to every user of the machine): `EASCLIENT_PASSWORD` and
+`EASCLIENT_AUTH_TOKEN`, or the keys `password` and `auth_token`, or the files `-password-file` and `-auth-token-file`.
+
+### The keys of an account
+
+An entry of `accounts` in the file has the keys below. The account of the command line has the same ones as the options `-server`, `-email` and so on.
+
+| Key                                         | What it says                                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `name`                                      | the name of the account (letters, digits, `.` `_` `-`, up to 64); how the REST API and the tools address it         |
+| `server`                                    | the ActiveSync endpoint, a host or a URL (autodiscover is not supported)                                            |
+| `email`, `user`                             | the address, and the login name if it differs; one of the two is needed                                             |
+| `password_file`, `password`, `password_env` | where the password is: a file (wins), the value, or the name of a variable; none of them means `EASCLIENT_PASSWORD` |
+| `device_id`, `profile`, `provision`         | the device, as the options above                                                                                    |
+| `time_zone`                                 | the zone of this account, if it is not the one of the configuration or of the machine                               |
+| `insecure`, `ca_file`                       | the TLS settings for this account, as the options above                                                             |
+| `headers`                                   | extra HTTP headers that are sent to Traveler (name and value)                                                       |
+
 
 ## In a container
 

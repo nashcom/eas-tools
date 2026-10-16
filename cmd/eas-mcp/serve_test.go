@@ -40,7 +40,7 @@ func endpoint(t *testing.T, token string, allow *ipacl.List) *httptest.Server {
 		t.Fatal(err)
 	}
 	t.Cleanup(m.Close)
-	api := httptest.NewServer(httpHandler(newServer(m, false, nil, 0), token, allow, false, quiet()))
+	api := httptest.NewServer(httpHandler(newServer(m, serverOptions{}), &authn{token: token, log: quiet()}, allow, false, true, quiet()))
 	t.Cleanup(api.Close)
 	return api
 }
@@ -89,7 +89,7 @@ func TestTheHTTPEndpointNeedsTheToken(t *testing.T) {
 }
 
 func TestTheHealthListenerHasHealthOnly(t *testing.T) {
-	h := httptest.NewServer(httpHandler(mcp.NewServer(&mcp.Implementation{Name: "x", Version: "1"}, nil), "", nil, true, quiet()))
+	h := httptest.NewServer(httpHandler(mcp.NewServer(&mcp.Implementation{Name: "x", Version: "1"}, nil), nil, nil, true, true, quiet()))
 	defer h.Close()
 	if resp, err := http.Get(h.URL + "/health"); err != nil || resp.StatusCode != 200 {
 		t.Errorf("health: %v %v", resp, err)
@@ -120,5 +120,81 @@ func TestTheDefaultPorts(t *testing.T) {
 		if got := defaultListen(c.given, c.allowHTTP); got != c.want {
 			t.Errorf("%+v: %s, want %s", c, got, c.want)
 		}
+	}
+}
+
+func TestTheHealthCheckOption(t *testing.T) {
+	api := endpoint(t, "", nil)
+	port := api.URL[strings.LastIndex(api.URL, ":")+1:]
+	run1 := func(args ...string) int {
+		var out strings.Builder
+		return run(args, strings.NewReader(""), &out, &out, func() []string { return nil })
+	}
+	// plain HTTP chosen: the health check asks the main port
+	if code := run1("-health-check", "-allow-http", "-listen", "127.0.0.1:"+port); code != 0 {
+		t.Errorf("a healthy endpoint: %d", code)
+	}
+	// nothing listens on the port after it: with TLS the check asks the health port
+	if code := run1("-health-check", "-listen", "127.0.0.1:"+port, "-tls-cert", "x.crt", "-tls-key", "x.key"); code != 1 {
+		t.Errorf("no health listener: %d", code)
+	}
+}
+
+func TestAnAddressThatDoesNotExistIsLogged(t *testing.T) {
+	var buf strings.Builder
+	log := slog.New(slog.NewTextHandler(&buf, nil))
+	h := httptest.NewServer(httpHandler(mcp.NewServer(&mcp.Implementation{Name: "x", Version: "1"}, nil), nil, nil, false, true, log))
+	defer h.Close()
+	req, _ := http.NewRequest("GET", h.URL+"/.well-known/oauth-authorization-server?token=s3cret", nil)
+	req.Header.Set("User-Agent", "inspector-test")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	out := buf.String()
+	if resp.StatusCode != http.StatusNotFound || !strings.Contains(out, "a request for an address that does not exist") || !strings.Contains(out, "/.well-known/oauth-authorization-server") ||
+		!strings.Contains(out, "inspector-test") {
+		t.Errorf("%d, log: %s", resp.StatusCode, out)
+	}
+	if strings.Contains(out, "s3cret") {
+		t.Errorf("the query was logged: %s", out)
+	}
+	// the addresses that exist are not in the log
+	buf.Reset()
+	if resp, err := http.Get(h.URL + "/health"); err == nil {
+		resp.Body.Close()
+	}
+	if strings.Contains(buf.String(), "does not exist") {
+		t.Errorf("/health was logged as missing: %s", buf.String())
+	}
+}
+
+func TestStatelessMeansNoSessionOfTheProtocol(t *testing.T) {
+	versions := mcp.SupportedProtocolVersions()
+	if !strings.Contains(strings.Join(versions, " "), "2026-07-28") {
+		t.Errorf("the SDK does not know the protocol 2026-07-28: %v", versions)
+	}
+	initialize := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}`
+	for _, stateless := range []bool{true, false} {
+		h := httptest.NewServer(httpHandler(mcp.NewServer(&mcp.Implementation{Name: "x", Version: "1"}, nil), nil, nil, false, stateless, quiet()))
+		req, _ := http.NewRequest("POST", h.URL+"/mcp", strings.NewReader(initialize))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		session := resp.Header.Get("Mcp-Session-Id")
+		if resp.StatusCode != 200 || (stateless && session != "") || (!stateless && session == "") {
+			t.Errorf("stateless=%v: status %d, session id %q", stateless, resp.StatusCode, session)
+		}
+		if stateless { // no stream of the server to the client: GET is not there
+			if g, err := http.Get(h.URL + "/mcp"); err != nil || g.StatusCode != http.StatusMethodNotAllowed {
+				t.Errorf("GET /mcp when stateless: %v %v, want 405", g, err)
+			}
+		}
+		h.Close()
 	}
 }

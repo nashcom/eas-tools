@@ -3,6 +3,7 @@ module github.com/nashcom/eas-tools
 go 1.27.2
 
 require (
+	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/google/jsonschema-go v0.4.3
 	github.com/hstern/go-activesync v1.1.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
