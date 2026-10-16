@@ -335,10 +335,15 @@ func TestReloadLoopExplainsAtTraceLevelWhyNothingChanged(t *testing.T) {
 
 	// other bytes, same settings: both hashes
 	same := strings.Replace(docOne, `{"min_interval_seconds": 61,`, "{\n \"min_interval_seconds\": 61,\n", 1)
-	if err := os.WriteFile(path, []byte(same), 0o600); err != nil {
+	// replaced in one step: the loop must never read a file that is truncated but not yet written
+	next := path + ".new"
+	if err := os.WriteFile(next, []byte(same), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_ = os.Chtimes(path, t0.Add(2*time.Minute), t0.Add(2*time.Minute))
+	_ = os.Chtimes(next, t0.Add(2*time.Minute), t0.Add(2*time.Minute))
+	if err := os.Rename(next, path); err != nil {
+		t.Fatal(err)
+	}
 	time.Sleep(1500 * time.Millisecond)
 	if out = buf.String(); !strings.Contains(out, "the bytes differ, but the settings are the same") || !strings.Contains(out, " -> ") {
 		t.Errorf("same settings not explained:\n%s", out)
