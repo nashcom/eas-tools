@@ -196,6 +196,9 @@ func TestAKeyThatTheProviderHasAddedIsFetched(t *testing.T) {
 	p := newProvider(t, "k1")
 	v, _ := New(context.Background(), p.config(""))
 	p.addKey(t, "k2") // the provider has rotated its keys
+
+	// more than MinRefresh: a fast clock (Linux) would otherwise still throttle the fetch
+	time.Sleep(5 * time.Millisecond)
 	if _, err := v.Verify(context.Background(), p.token(t, "k2", p.claims(nil))); err != nil {
 		t.Errorf("a token of the new key: %v", err)
 	}
